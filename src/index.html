@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CS 4280 Computer Graphics — WebGPU course starter." />
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23020617'/%3E%3Cpolygon points='16,7 26,25 6,25' fill='%2338bdf8'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/style.css" />
+  <title>CS 4280 · Computer Graphics (WebGPU)</title>
+</head>
+
+<body>
+  <div class="page">
+    <h1>CS 4280 · Computer Graphics — Starter</h1>
+    <p class="summary">
+      Below are two complete, runnable examples: a plain Canvas 2D example showing Earth and its Moon orbiting the Sun,
+      and a simple WebGPU example that renders a triangle and demonstrates the complete graphics pipeline. Both examples
+      are intended as starting points for upcoming assignments. See this project's <code>README.md</code> for more
+      information.
+    </p>
+    <div class="layout">
+      <div class="example">
+        <span class="example-tag">Canvas2D</span>
+        <h2>Hello Canvas2D</h2>
+        <p>
+          A plain Canvas-API example: no GPU device or pipeline underneath it.
+        </p>
+        <div class="canvas-frame">
+          <canvas id="canvas2d"></canvas>
+          <p id="status2d" class="status-overlay" hidden></p>
+        </div>
+      </div>
+      <div class="example">
+        <span class="example-tag">WebGPU</span>
+        <h2>Hello Triangle</h2>
+        <p>
+          Adapter → device → context → render pipeline → your first WGSL shaders. Read this
+          before Assignment 2, your first hand-written WebGPU pipeline.
+        </p>
+        <div class="canvas-frame">
+          <canvas id="canvasWebgpu"></canvas>
+          <p id="statusWebgpu" class="status-overlay" hidden></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="./hello-canvas2d.js"></script>
+  <script type="module" src="./hello-triangle.js"></script>
+</body>
+
+</html>

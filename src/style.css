@@ -1,0 +1,113 @@
+/* Shared, minimal styling for the home page. No component framework; every
+   page links this one file directly. activities/ and assignments/ are
+   currently empty placeholders (see README.md) — as pages get built into
+   them, this file is the place to bring back per-page rules (controls,
+   a back-link, etc.) from reference/'s style.css, which still has them. */
+
+:root {
+  color-scheme: dark;
+  --bg: #05070d;
+  --panel: #10141f;
+  --border: #262c3d;
+  --text: #e7e9ee;
+  --text-dim: #9aa1b4;
+  --accent: #5b9dff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 1.5rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.page {
+  max-width: 60rem;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 0.5rem;
+}
+
+p.summary {
+  color: var(--text-dim);
+  margin: 0 0 1.25rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+
+.canvas-frame {
+  position: relative;
+  flex: 1 1 32rem;
+  min-height: 420px;
+  height: 70vh;
+  max-height: 640px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: #000;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.status-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+/* ---- Home page: two running examples, side by side ---- */
+
+.example {
+  display: flex;
+  flex: 1 1 26rem;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.example-tag {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+
+.example h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.example p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.example .canvas-frame {
+  margin-top: 0.25rem;
+}
