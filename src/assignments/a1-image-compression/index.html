@@ -8,6 +8,17 @@
           href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23020617'/%3E%3Cpolygon points='16,7 26,25 6,25' fill='%2338bdf8'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/style.css" />
     <title>CS 4280 · Assignment 1</title>
+    <style>
+        .full-row {
+            flex: 1 1 100%;
+        }
+        .gallery {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+    </style>
 </head>
 
 <body>
@@ -20,33 +31,43 @@
         information.
     </p>
     <div class="layout">
-        <div class="example">
-            <span class="example-tag">Canvas2D</span>
-            <h2>Hello Canvas2D</h2>
-            <p>
-                A plain Canvas-API example: no GPU device or pipeline underneath it.
-            </p>
-            <div class="canvas-frame">
-                <canvas id="canvas2d"></canvas>
-                <p id="status2d" class="status-overlay" hidden></p>
-            </div>
+        <div class="example full-row">
+            <h2>Controls</h2>
+                <label for="paletteSize" id="paletteSizeLabel">Palette size:</label>
+                <input type="range" id="paletteSize" name="paletteSize" min="0" max="100" value="50" step="1">
+                <label for="levelsPerChannel" id="levelsPerChannelLabel">Levels per channel:</label>
+                <input type="range" id="levelsPerChannel" name="levelsPerChannel" min="0" max="100" value="50" step="1">
+                <label for="blockSize" id="blockSizeLabel">Block Size:</label>
+                <input type="range" id="blockSize" name="blockSize" min="0" max="100" value="50" step="1">
         </div>
-        <div class="example">
-            <span class="example-tag">WebGPU</span>
-            <h2>Hello Triangle</h2>
-            <p>
-                Adapter → device → context → render pipeline → your first WGSL shaders. Read this
-                before Assignment 2, your first hand-written WebGPU pipeline.
-            </p>
-            <div class="canvas-frame">
-                <canvas id="canvasWebgpu"></canvas>
-                <p id="statusWebgpu" class="status-overlay" hidden></p>
-            </div>
+        <div class="example full-row" id="sample-container">
+            <h2>Sample Image</h2>
+        </div>
+        <div class="example full-row" id="personal">
+            <h2>Personal Image</h2>
+            <div class="canvas-frame" id="personal-frame"></div>
+            <table>
+                <tr>
+                    <td>Size</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td>Compression Ratio</td>
+                    <td>1.06</td>
+                </tr>
+                <tr>
+                    <td>Space saved</td>
+                    <td>1.06</td>
+                </tr>
+                <tr>
+                    <td>Peak Signal-to-Noise Ratio</td>
+                    <td>10dB</td>
+                </tr>
+            </table>
         </div>
     </div>
 </div>
-<script type="module" src="./hello-canvas2d.js"></script>
-<script type="module" src="./hello-triangle.js"></script>
+<script type="module" src="./main.js"></script>
 </body>
 
 </html>
