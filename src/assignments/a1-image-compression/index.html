@@ -8,18 +8,42 @@
           href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23020617'/%3E%3Cpolygon points='16,7 26,25 6,25' fill='%2338bdf8'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/style.css" />
     <title>CS 4280 · Assignment 1</title>
-    <style>
-        .full-row {
-            flex: 1 1 100%;
-        }
-        .gallery {
-            display: flex;
-            flex-direction: row;
-            flex-wrap: wrap;
-            width: 100%;
-        }
-    </style>
+
 </head>
+
+<style>
+    .page {
+        max-width: 90rem;
+    }
+    .full-row {
+        flex: 1 1 100%;
+    }
+    .gallery {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
+    }
+    .gallery .canvas-frame {
+        flex: 0 0 auto;
+        min-height: 0;
+        height: auto;
+    }
+    .gallery .imagebox {
+        display: flex;
+        flex-direction: column;
+        padding: 1rem;
+    }
+    .comparison-table tbody tr:nth-child(2n) {
+        background-color: #555555;
+    }
+    .comparison-table tbody tr:nth-child(2n+1) {
+        background-color: #5f5f5f;
+    }
+    .comparison-table tbody tr {
+        text-align: center;
+    }
+</style>
 
 <body>
 <div class="page">
@@ -38,14 +62,73 @@
                 <label for="levelsPerChannel" id="levelsPerChannelLabel">Levels per channel:</label>
                 <input type="range" id="levelsPerChannel" name="levelsPerChannel" min="0" max="100" value="50" step="1">
                 <label for="blockSize" id="blockSizeLabel">Block Size:</label>
-                <input type="range" id="blockSize" name="blockSize" min="0" max="100" value="50" step="1">
+                <input type="range" id="blockSize" name="blockSize" min="0" max="10" value="10" step="2">
         </div>
         <div class="example full-row" id="sample-container">
             <h2>Sample Image</h2>
         </div>
-        <div class="example full-row" id="personal">
+        <div class="example full-row" id="personal-container">
             <h2>Personal Image</h2>
-            <div class="canvas-frame" id="personal-frame"></div>
+        </div>
+        <div class="example full-row">
+            <h2>Compression Comparison</h2>
+            <table class="comparison-table">
+                <tr style="background-color: blueviolet;">
+                    <th>Image</th>
+                    <th>Technique</th>
+                    <th>Parameter</th>
+                    <th>Size</th>
+                    <th>Compression Ratio</th>
+                    <th>Space Saved</th>
+                    <th>PSNR</th>
+                </tr>
+                <tr>
+                    <td>Personal</td>
+                    <td>Original</td> <!-- Original. Indexed Color, Color Quantization, Block Average-->
+                    <td>Parameter</td>
+                    <td>Size</td>
+                    <td>Compression Ratio</td>
+                    <td>Space Saved</td>
+                    <td>PSNR</td>
+                </tr>
+                <tr>
+                    <td>Personal</td>
+                    <td>Indexed Color</td> <!-- Original. Indexed Color, Color Quantization, Block Average-->
+                    <td>Parameter</td>
+                    <td>Size</td>
+                    <td>Compression Ratio</td>
+                    <td>Space Saved</td>
+                    <td>PSNR</td>
+                </tr>
+                <tr>
+                    <td>Personal</td>
+                    <td>Color Quantization</td> <!-- Original. Indexed Color, Color Quantization, Block Average-->
+                    <td>Parameter</td>
+                    <td>Size</td>
+                    <td>Compression Ratio</td>
+                    <td>Space Saved</td>
+                    <td>PSNR</td>
+                </tr>
+                <tr>
+                    <td>Personal</td>
+                    <td>Block Average</td> <!-- Original. Indexed Color, Color Quantization, Block Average-->
+                    <td>Parameter</td>
+                    <td>Size</td>
+                    <td>Compression Ratio</td>
+                    <td>Space Saved</td>
+                    <td>PSNR</td>
+                </tr>
+                <tr>
+                    <td>Sample</td>
+                    <td>Original</td>
+                    <td>Parameter</td>
+                    <td>Size</td>
+                    <td>Compression Ratio</td>
+                    <td>Space Saved</td>
+                    <td>PSNR</td>
+                </tr>
+            </table>
+
             <table>
                 <tr>
                     <td>Size</td>
@@ -64,6 +147,7 @@
                     <td>10dB</td>
                 </tr>
             </table>
+            <button type="button" onclick="alert('Hello World!')">Click Me</button>
         </div>
     </div>
 </div>
