@@ -2,6 +2,7 @@ import photoUrl from "./my-photo.jpg"
 import { imageDataFromSource } from "@/lib/image/loadImage.js";
 import { createSampleImage } from "@/lib/image/sampleImage.js";
 import { averageBlocks } from "@/lib/image/blockAverage.js";
+import { medianCutPalette, applyPalette } from "@/lib/image/palette.js";
 
 const IMAGE_SIZE = 320 // size in px
 
@@ -64,7 +65,11 @@ const IMAGE_MODIFIERS = [
         title: "Indexed Color",
         control: "paletteSize",
         fn: function(_imageData) {
-            return _imageData;
+            const palette = medianCutPalette(_imageData, controlValues["paletteSize"]);
+            // medianCutPalette(_imageData, _paletteSize)
+            // applyPalette(_imageData, _palette)
+            // nearestPaletteIndex(_color, _palette)
+            return applyPalette(_imageData).imageData;
         }
     },
     {
