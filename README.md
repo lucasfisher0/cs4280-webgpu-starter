@@ -61,7 +61,7 @@ src/
 │   ├── math/                # vec2/vec3/vec4/mat4 (implemented) + transforms/curves (TODO stubs)
 │   ├── webgpu/               # context/buffer/shader/texture/geometry/blit helpers (implemented)
 │   ├── scenegraph/            # SceneNode — construction is given; traversal is a TODO stub
-│   └── image/                  # loadImage/sampleImage/storage (implemented) + palette/quantize/blockAverage (TODO stubs)
+│   └── image/                  # loadImage/sampleImage/storage (implemented) + palette/quantize/blockAverage/compare (TODO stubs) + ppm (mixed: encodePPM TODO, downloadBytes given)
 ├── activities/     # placeholder — one .keep file, nothing else yet
 └── assignments/    # placeholder — one .keep file, nothing else yet
 ```
@@ -84,10 +84,14 @@ and `src/hello-triangle.js` are worked examples of exactly this shape.
 - **`src/lib/webgpu/`, `src/lib/image/{loadImage,sampleImage,storage}.js`**
   — working infrastructure, not graded content.
 - **`src/lib/math/transforms.js`, `src/lib/math/curves.js`,
-  `src/lib/image/{palette,quantize,blockAverage}.js`** — every function
-  throws `"not implemented"`. These *are* Assignment 1, 2, and 5's actual
-  deliverables; implementing them is most of what those three assignments
-  ask for.
+  `src/lib/image/{palette,quantize,blockAverage,compare}.js`** — every
+  function throws `"not implemented"`. These *are* Assignment 1, 2, and 5's
+  actual deliverables; implementing them is most of what those three
+  assignments ask for.
+- **`src/lib/image/ppm.js`** — `downloadBytes()` (triggers a browser file
+  download) is given; `encodePPM()` throws — it's part of Assignment 1's
+  deliverable too, alongside `palette`/`quantize`/`blockAverage`/`compare`
+  above.
 - **`src/lib/scenegraph/SceneNode.js`** — construction/bookkeeping
   (`addChild`, `setLocalTransform`, `find`) is given; `updateWorldTransforms()`
   and `traverse()` throw — they're Assignment 4's "parent-child transform
