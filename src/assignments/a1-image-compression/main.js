@@ -195,10 +195,35 @@ function downloadImage(targetId) {
     const canvas = document.getElementById(targetId);
     if (canvas)
     {
+        const filename = `${targetId.toLowerCase()}.ppm`;
+
+        // TODO: File is a binary P6. Ask about "provided" downloadBytes function.
+        // This functionality should be in encodePPM at src/lib/image/ppm.js
+
         const ctx = canvas.getContext("2d");
-        ctx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE)
-        // TODO: Finish download
+        const img = ctx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE);
+
+        var lines = "";
+        lines += "P3\n" // P3 is used for ASCII text
+        lines += `${img.width} + ${img.height}\n`;
+        lines += '255';
+        for (let i = 0; i < img.data.length / 4; i++)
+            lines += `${img.data[i*4]} ${img.data[i*4+1]} ${img.data[i*4+2]}\n`;
+
+        const blob = new Blob(lines, { type: "image/x-portable-pixmap" })
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.style.display = 'none';
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     }
+    // TODO ERROR if not found
     // console.log("Download: " + JSON.stringify(imageData));
 }
 
