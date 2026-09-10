@@ -3,6 +3,8 @@ import { imageDataFromSource } from "@/lib/image/loadImage.js";
 import { createSampleImage } from "@/lib/image/sampleImage.js";
 import { averageBlocks } from "@/lib/image/blockAverage.js";
 import { medianCutPalette, applyPalette } from "@/lib/image/palette.js";
+import { posterizeChannels } from '@/lib/image/quantize';
+
 
 const IMAGE_SIZE = 320 // size in px
 
@@ -11,7 +13,7 @@ const CONTROLS = ["paletteSize", "levelsPerChannel", "blockSize"];
 let controlLabels = {};
 let controlValues = {
     "paletteSize": 4,
-    "levelsPerChannel" : 50,
+    "levelsPerChannel" : 20,
     "blockSize": 10
 };
 
@@ -92,7 +94,7 @@ const IMAGE_MODIFIERS = [
         control: "paletteSize",
         fn: function(_imageData) {
             const palette = medianCutPalette(_imageData, controlValues["paletteSize"]);
-            console.log("Refreshing with " + palette.length + " colors...");
+            // console.log("Refreshing with " + palette.length + " colors...");
             return applyPalette(_imageData, palette).imageData;
         }
     },
@@ -100,7 +102,7 @@ const IMAGE_MODIFIERS = [
         title: "Color Quantization",
         control: "levelsPerChannel",
         fn: function(_imageData) {
-            return _imageData;
+            return posterizeChannels(_imageData, controlValues["levelsPerChannel"]);
         }
     },
     {
