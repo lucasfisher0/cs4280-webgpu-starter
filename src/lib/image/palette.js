@@ -21,11 +21,11 @@ export function medianCutPalette(_imageData, _paletteSize) {
 }
 
 function getImagePixels(_imageData) {
-  let pixels = [];
+  const pixels = [];
   for (let i = 0; i < _imageData.data.length / 4; i++) {
     const R = _imageData.data[i * 4];
     const G = _imageData.data[i * 4 + 1];
-    const B = _imageData.data[i * 4 + 2]
+    const B = _imageData.data[i * 4 + 2];
     pixels.push([R, G, B]);
   }
 
@@ -60,13 +60,13 @@ function medianCutRGB(pixels, _paletteSize) {
     return [[R, G, B]];
   }
 
-  let channel = selectWidestChannel(pixels);
+  const channel = selectWidestChannel(pixels);
   pixels.sort((a, b) => a[channel] - b[channel]);
   const median = Math.trunc(pixels.length / 2);
 
   return [
     ...medianCutRGB(pixels.slice(0, median), _paletteSize / 2),
-    ...medianCutRGB(pixels.slice(median), _paletteSize / 2)
+    ...medianCutRGB(pixels.slice(median), _paletteSize / 2),
   ];
 }
 
@@ -76,23 +76,20 @@ function medianCutRGB(pixels, _paletteSize) {
  * @returns {number} channel as an index from 0-2
  */
 function selectWidestChannel(pixels) {
-  let maxWidth = -1
+  let maxWidth = -1;
   let channel = -1;
   for (let i = 0; i < 3; i++) {
     let min = 255;
     let max = 0;
 
     for (let ix = 0; i < pixels.length; i++) {
-      let val = pixels[ix][i];
-      if (val < min)
-        min = val;
-      if (val > max)
-        max = val;
+      const val = pixels[ix][i];
+      if (val < min) min = val;
+      if (val > max) max = val;
     }
 
     const width = max - min;
-    if (width < maxWidth)
-      continue;
+    if (width < maxWidth) continue;
 
     channel = i;
     maxWidth = width;
@@ -103,19 +100,18 @@ function selectWidestChannel(pixels) {
 
 /** Index of the palette entry closest to `color` in RGB Euclidean distance. */
 export function nearestPaletteIndex(_color, _palette) {
-  if (_palette.length === 0)
-    return 0;
+  if (_palette.length === 0) return 0;
 
   let maxDist = 999;
   let index = -1;
   for (let i = 0; i < _palette.length; i++) {
     const dist = Math.sqrt(
       (_color[0] - _palette[i][0]) ** 2 +
-      (_color[1] - _palette[i][1]) ** 2 +
-      (_color[2] - _palette[i][2]) ** 2);
+        (_color[1] - _palette[i][1]) ** 2 +
+        (_color[2] - _palette[i][2]) ** 2,
+    );
 
-    if (dist > maxDist)
-      continue;
+    if (dist > maxDist) continue;
 
     maxDist = dist;
     index = i;
@@ -130,11 +126,11 @@ export function nearestPaletteIndex(_color, _palette) {
  */
 export function applyPalette(_imageData, _palette) {
   const data = new Uint8ClampedArray(_imageData.data);
-  let indices = new Uint8Array(data.length);
+  const indices = new Uint8Array(data.length);
 
   for (let i = 0; i < data.length / 4; i++) {
     const color = [_imageData.data[i * 4], _imageData.data[i * 4 + 1], _imageData.data[i * 4 + 2]];
-    let index = nearestPaletteIndex(color, _palette);
+    const index = nearestPaletteIndex(color, _palette);
 
     indices[i] = index;
     data[i * 4] = _palette[index][0];
@@ -142,7 +138,7 @@ export function applyPalette(_imageData, _palette) {
     data[i * 4 + 2] = _palette[index][2];
   }
 
-  return {imageData: new ImageData(data, _imageData.width, _imageData.height), indices: indices};
+  return { imageData: new ImageData(data, _imageData.width, _imageData.height), indices: indices };
 
   // throw new Error("applyPalette: not implemented");
 }

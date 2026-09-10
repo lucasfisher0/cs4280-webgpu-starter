@@ -47,18 +47,18 @@
     </div>
     <script>
       function toggleVisibility(id) {
-        let elem = document.getElementById(id);
+        const elem = document.getElementById(id);
         if (elem)
           elem.toggleAttribute("collapsed");
       }
     </script>
     <div class="example full-row" id="sample-container">
-      <button onclick="toggleVisibility('sampleGallery')">
+      <button type="button" onclick="toggleVisibility('sampleGallery')">
         <h2>Sample Image &#8693;</h2>
       </button>
     </div>
     <div class="example full-row" id="personal-container">
-      <button onclick="toggleVisibility('personalGallery')">
+      <button type="button" onclick="toggleVisibility('personalGallery')">
         <h2>Personal Image &#8693;</h2>
       </button>
     </div>
