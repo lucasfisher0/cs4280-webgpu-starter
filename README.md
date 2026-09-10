@@ -40,6 +40,7 @@ examples directly.
 | `npm run dev` | Start the Vite dev server. |
 | `npm run build` | Production build to `dist/` (every page listed in `vite.config.js`'s `pages` array). |
 | `npm run preview` | Serve the production build locally. |
+| `npm run test` | Run vitest. |
 | `npm run lint` | Check formatting/lint rules with Biome. |
 | `npm run lint:fix` | Same, applying safe fixes. |
 | `npm run ci` | `lint` + `test` + `build`, what CI runs. |

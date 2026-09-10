@@ -9,35 +9,61 @@ const IMAGE_SIZE = 320 // size in px
 //#region Controls
 const CONTROLS = ["paletteSize", "levelsPerChannel", "blockSize"];
 let controlLabels = {};
-let controlValues = {};
+let controlValues = {
+    "paletteSize": 4,
+    "levelsPerChannel" : 50,
+    "blockSize": 10
+};
 
 // Add event listeners to control inputs
 function setupControls() {
     for (const control of CONTROLS) {
-        const elem = document.getElementById(control);
         const label = document.getElementById(control+"Label");
         controlLabels[control] = label.innerHTML;
-        elem.addEventListener('input', event => onControlChanged(control, event.target.value));
-        onControlChanged(control, elem.value); // Set labels to initial values
+
+        const elem = document.getElementById(control);
+        elem.value = controlValues[control];
+        elem.addEventListener('input', event => onControlInput(control, event.target.value));
+        elem.addEventListener('change', event => onControlChanged(control));
+        onControlInput(control, controlValues[control]);
+        onControlChanged(control); // Set labels to initial values
     }
 }
 
-// Update Labels, Update Image Graphics
-function onControlChanged(name, newValue) {
+/**
+ * Runs constantly when a control slider is held. Used for label updates and value validations.
+ * Runs before `onControlChanged`, allowing for easier access of value modification.
+ * @param name
+ * @param newValue
+ */
+function onControlInput(name, newValue) {
+    // Input Validation
+    if (name === "paletteSize") {
+        newValue = 2**newValue;
+    }
+
+    // Control Labels
     const label = document.getElementById(name+"Label");
     label.innerHTML = controlLabels[name] + " " + newValue;
     controlValues[name] = newValue;
+    return newValue;
+}
 
+// Update Labels, Update Image Graphics
+
+/**
+ * Runs once when a control slider is let go to dispatch image updates.
+ * @param name
+ */
+function onControlChanged(name) {
     const controlChangedEvent = new CustomEvent("controlChanged", {
         detail: {
             control: name,
-            value: newValue
+            value: controlValues[name]
         }});
 
     const canvases = document.querySelectorAll('canvas')
     canvases.forEach((canvas) => canvas.dispatchEvent(controlChangedEvent));
-
-
 }
 //#endregion
 
@@ -66,10 +92,8 @@ const IMAGE_MODIFIERS = [
         control: "paletteSize",
         fn: function(_imageData) {
             const palette = medianCutPalette(_imageData, controlValues["paletteSize"]);
-            // medianCutPalette(_imageData, _paletteSize)
-            // applyPalette(_imageData, _palette)
-            // nearestPaletteIndex(_color, _palette)
-            return applyPalette(_imageData).imageData;
+            console.log("Refreshing with " + palette.length + " colors...");
+            return applyPalette(_imageData, palette).imageData;
         }
     },
     {
@@ -118,7 +142,7 @@ function buildGallery(imageData, galleryTitle) {
         canvas.width = IMAGE_SIZE;
         canvas.height = IMAGE_SIZE;
         const ctx = canvas.getContext("2d");
-        console.log(JSON.stringify(MODIFIER.fn(imageData)));
+        // console.log(JSON.stringify(MODIFIER.fn(imageData)));
         ctx.putImageData(MODIFIER.fn(imageData), 0, 0);
         frame.append(canvas);
 
@@ -130,6 +154,7 @@ function buildGallery(imageData, galleryTitle) {
         canvas.addEventListener('controlChanged', (event) => {
             if (event.target.dataset.control === event.detail.control)
             {
+                console.log("Refreshing for modifier: " + event.detail.control);
                 const MODIFIER = IMAGE_MODIFIERS.find(x => x.control === event.target.dataset.control);
                 if (MODIFIER) {
 
