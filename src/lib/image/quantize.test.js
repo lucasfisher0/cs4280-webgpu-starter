@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'vitest'
-import { quantizeChannel, posterizeChannels } from './quantize';
+import {describe, expect, test} from 'vitest'
+import {quantizeChannel, posterizeChannels} from './quantize';
 
 describe('Color Quantization', () => {
 
@@ -18,9 +18,9 @@ describe('Color Quantization', () => {
     const levels = 5; // step size of 51
 
     const imageData = new ImageData(
-        new Uint8ClampedArray([
-            ...[30, 50, 80, 255],
-            ...[80, 120, 150, 255]]), 2, 1);
+      new Uint8ClampedArray([
+        ...[30, 50, 80, 255],
+        ...[80, 120, 150, 255]]), 2, 1);
 
     const posterized = posterizeChannels(imageData, levels);
     expect(posterized.data.slice(0, 3)).toEqual(new Uint8ClampedArray([51, 51, 102]));

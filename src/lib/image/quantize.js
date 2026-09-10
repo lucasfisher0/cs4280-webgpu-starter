@@ -26,8 +26,8 @@ export function quantizeChannel(_value, _levels) {
 export function posterizeChannels(_imageData, _levelsPerChannel) {
   let pixels = new Uint8ClampedArray(_imageData.data);
 
-  for(let i = 0; i < pixels.length; i++) {
-    if ((i+1) % 4 === 0) // Skip alpha channel
+  for (let i = 0; i < pixels.length; i++) {
+    if ((i + 1) % 4 === 0) // Skip alpha channel
       continue;
 
     pixels[i] = quantizeChannel(pixels[i], _levelsPerChannel)

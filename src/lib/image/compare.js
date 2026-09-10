@@ -15,7 +15,17 @@
  * @returns {number}
  */
 export function meanSquaredError(_original, _compressed) {
-  throw new Error("meanSquaredError: not implemented");
+  // MSE = avg((original - compressed)**2);
+  let MSE = 0;
+
+  for (let i = 0; i < _original.data.length; i++) {
+    if ((i + 1) % 4 === 0)
+      continue;
+
+    MSE += (_original.data[i] - _compressed.data[i]) ** 2;
+  }
+
+  return MSE / _original.data.length * 0.75; // 0.75 represents 3/4 channels, hence 3/4 the bytes
 }
 
 /**
@@ -28,5 +38,6 @@ export function meanSquaredError(_original, _compressed) {
  * @returns {number}
  */
 export function psnr(_original, _compressed) {
-  throw new Error("psnr: not implemented");
+  const MSE = meanSquaredError(_original, _compressed);
+  return MSE === 0 ? Infinity : 10 * Math.log10(255 ** 2 / MSE);
 }
