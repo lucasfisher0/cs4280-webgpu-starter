@@ -14,12 +14,28 @@
  * @returns {Uint8Array}
  */
 export function encodePPM(_imageData) {
-  throw new Error("encodePPM: not implemented");
+
+  let header = "P6\n";
+  header += `${_imageData.width} ${_imageData.height}\n`;
+  header += '255\n';
+
+  const headerBytes = new TextEncoder().encode(header);
+  const pixelCount = _imageData.width * _imageData.height;
+
+  let bytes = new Uint8Array(headerBytes.byteLength + pixelCount*3);
+  bytes.set(headerBytes);
+  for (let i = 0; i < pixelCount; i++) {
+    const offset = i * 4;
+    const pixel = new Uint8Array([_imageData.data[offset], _imageData.data[offset+1], _imageData.data[offset+2]]);
+    bytes.set(pixel, headerBytes.byteLength + i*3);
+  }
+
+  return bytes;
 }
 
 /** Triggers a browser download of `bytes` as `filename`. */
 export function downloadBytes(bytes, filename) {
-  const blob = new Blob([bytes], { type: "application/octet-stream" });
+  const blob = new Blob([bytes], {type: "application/octet-stream"});
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

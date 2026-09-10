@@ -23,10 +23,10 @@ export function medianCutPalette(_imageData, _paletteSize) {
 function getImagePixels(_imageData) {
   let pixels = [];
   for (let i = 0; i < _imageData.data.length / 4; i++) {
-    const R = _imageData.data[i*4];
-    const G = _imageData.data[i*4+1];
-    const B = _imageData.data[i*4+2]
-    pixels.push([R,G,B]);
+    const R = _imageData.data[i * 4];
+    const G = _imageData.data[i * 4 + 1];
+    const B = _imageData.data[i * 4 + 2]
+    pixels.push([R, G, B]);
   }
 
   return pixels;
@@ -43,8 +43,7 @@ function getImagePixels(_imageData) {
  */
 function medianCutRGB(pixels, _paletteSize) {
   // Return average color of single boxes, simple sum and divide
-  if (_paletteSize === 1 || pixels.length === 1)
-  {
+  if (_paletteSize === 1 || pixels.length === 1) {
     let R = 0;
     let G = 0;
     let B = 0;
@@ -54,11 +53,11 @@ function medianCutRGB(pixels, _paletteSize) {
       B += pixels[i][2];
     }
 
-    R = Math.trunc(R/pixels.length);
-    G = Math.trunc(G/pixels.length);
-    B = Math.trunc(B/pixels.length);
+    R = Math.trunc(R / pixels.length);
+    G = Math.trunc(G / pixels.length);
+    B = Math.trunc(B / pixels.length);
 
-    return [[R,G,B]];
+    return [[R, G, B]];
   }
 
   let channel = selectWidestChannel(pixels);
@@ -91,7 +90,7 @@ function selectWidestChannel(pixels) {
         max = val;
     }
 
-    const width = max-min;
+    const width = max - min;
     if (width < maxWidth)
       continue;
 
@@ -111,9 +110,9 @@ export function nearestPaletteIndex(_color, _palette) {
   let index = -1;
   for (let i = 0; i < _palette.length; i++) {
     const dist = Math.sqrt(
-        (_color[0]-_palette[i][0])**2 +
-        (_color[1]-_palette[i][1])**2 +
-        (_color[2]-_palette[i][2])**2 );
+      (_color[0] - _palette[i][0]) ** 2 +
+      (_color[1] - _palette[i][1]) ** 2 +
+      (_color[2] - _palette[i][2]) ** 2);
 
     if (dist > maxDist)
       continue;
@@ -134,16 +133,16 @@ export function applyPalette(_imageData, _palette) {
   let indices = new Uint8Array(data.length);
 
   for (let i = 0; i < data.length / 4; i++) {
-    const color = [_imageData.data[i*4],_imageData.data[i*4+1],_imageData.data[i*4+2]];
+    const color = [_imageData.data[i * 4], _imageData.data[i * 4 + 1], _imageData.data[i * 4 + 2]];
     let index = nearestPaletteIndex(color, _palette);
 
     indices[i] = index;
-    data[i*4] = _palette[index][0];
-    data[i*4+1] = _palette[index][1];
-    data[i*4+2] = _palette[index][2];
+    data[i * 4] = _palette[index][0];
+    data[i * 4 + 1] = _palette[index][1];
+    data[i * 4 + 2] = _palette[index][2];
   }
 
-  return { imageData: new ImageData(data, _imageData.width, _imageData.height), indices: indices };
+  return {imageData: new ImageData(data, _imageData.width, _imageData.height), indices: indices};
 
   // throw new Error("applyPalette: not implemented");
 }

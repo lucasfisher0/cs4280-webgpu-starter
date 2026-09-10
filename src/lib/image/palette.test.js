@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'vitest'
-import { medianCutPalette, nearestPaletteIndex } from './palette';
+import {describe, expect, test} from 'vitest'
+import {medianCutPalette, nearestPaletteIndex} from './palette';
 
 
 describe('Indexed Color', () => {
@@ -12,7 +12,7 @@ describe('Indexed Color', () => {
     const pixels1 = new Uint8ClampedArray([...col1, ...col2]);
     const img1 = new ImageData(pixels1, 2, 1);
     const palette1 = medianCutPalette(img1, 2);
-    expect(palette1).toEqual([[255, 51, 51],[255, 204, 153]]);
+    expect(palette1).toEqual([[255, 51, 51], [255, 204, 153]]);
 
     const pixels2 = new Uint8ClampedArray([...col1, ...col1, ...col2, ...col2]);
     const img2 = new ImageData(pixels2, 2, 2);

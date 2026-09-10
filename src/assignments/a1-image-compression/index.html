@@ -2,128 +2,156 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml"
-          href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23020617'/%3E%3Cpolygon points='16,7 26,25 6,25' fill='%2338bdf8'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="/style.css" />     <!-- ROOT STYLESHEET -->
-    <link rel="stylesheet" href="./style.css" />    <!-- LOCAL STYLESHEET -->
-    <title>CS 4280 · Assignment 1</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23020617'/%3E%3Cpolygon points='16,7 26,25 6,25' fill='%2338bdf8'/%3E%3C/svg%3E"/>
+  <link rel="stylesheet" href="/style.css"/>     <!-- ROOT STYLESHEET -->
+  <link rel="stylesheet" href="./style.css"/>    <!-- LOCAL STYLESHEET -->
+  <title>CS 4280 · Assignment 1</title>
 </head>
 
 <body>
 <div class="page">
-    <h1>CS 4280 · Assignment 1</h1>
-    <p class="summary">
-        Below are two complete, runnable examples: a plain Canvas 2D example showing Earth and its Moon orbiting the Sun,
-        and a simple WebGPU example that renders a triangle and demonstrates the complete graphics pipeline. Both examples
-        are intended as starting points for upcoming assignments. See this project's <code>README.md</code> for more
-        information.
-    </p>
-    <div class="layout">
-        <div class="example">
-            <p class="summary">
-                Below are two complete, runnable examples: a plain Canvas 2D example showing Earth and its Moon orbiting the Sun,
-                and a simple WebGPU example that renders a triangle and demonstrates the complete graphics pipeline. Both examples
-                are intended as starting points for upcoming assignments. See this project's <code>README.md</code> for more
-                information.
-            </p>
-        </div>
-        <div class="example">
-            <h2>Controls</h2>
-                <label for="paletteSize" id="paletteSizeLabel">Palette size:</label>
-                <input type="range" id="paletteSize" name="paletteSize" min="1" max="9" step="1">
-                <label for="levelsPerChannel" id="levelsPerChannelLabel">Levels per channel:</label>
-                <input type="range" id="levelsPerChannel" name="levelsPerChannel" min="1" max="50">
-                <label for="blockSize" id="blockSizeLabel">Block Size:</label>
-                <input type="range" id="blockSize" name="blockSize" min="0" max="10" step="2">
-        </div>
-        <div class="example full-row" id="sample-container">
-            <h2>Sample Image</h2>
-        </div>
-        <div class="example full-row" id="personal-container">
-            <h2>Personal Image</h2>
-        </div>
-        <div class="example full-row">
-            <h2>Compression Comparison</h2>
-            <table class="comparison-table">
-                <tr style="background-color: blueviolet;">
-                    <th>Image</th>
-                    <th>Technique</th>
-                    <th>Parameter</th>
-                    <th>Size</th>
-                    <th>Compression Ratio</th>
-                    <th>Space Saved</th>
-                    <th>PSNR</th>
-                </tr>
-                <tr>
-                    <td>Personal</td>
-                    <td>Original</td> <!-- Original. Indexed Color, Color Quantization, Block Average-->
-                    <td>Parameter</td>
-                    <td>Size</td>
-                    <td>Compression Ratio</td>
-                    <td>Space Saved</td>
-                    <td>PSNR</td>
-                </tr>
-                <tr>
-                    <td>Personal</td>
-                    <td>Indexed Color</td> <!-- Original. Indexed Color, Color Quantization, Block Average-->
-                    <td>Parameter</td>
-                    <td>Size</td>
-                    <td>Compression Ratio</td>
-                    <td>Space Saved</td>
-                    <td>PSNR</td>
-                </tr>
-                <tr>
-                    <td>Personal</td>
-                    <td>Color Quantization</td> <!-- Original. Indexed Color, Color Quantization, Block Average-->
-                    <td>Parameter</td>
-                    <td>Size</td>
-                    <td>Compression Ratio</td>
-                    <td>Space Saved</td>
-                    <td>PSNR</td>
-                </tr>
-                <tr>
-                    <td>Personal</td>
-                    <td>Block Average</td> <!-- Original. Indexed Color, Color Quantization, Block Average-->
-                    <td>Parameter</td>
-                    <td>Size</td>
-                    <td>Compression Ratio</td>
-                    <td>Space Saved</td>
-                    <td>PSNR</td>
-                </tr>
-                <tr>
-                    <td>Sample</td>
-                    <td>Original</td>
-                    <td>Parameter</td>
-                    <td>Size</td>
-                    <td>Compression Ratio</td>
-                    <td>Space Saved</td>
-                    <td>PSNR</td>
-                </tr>
-            </table>
+  <h1>CS 4280 · Assignment 1</h1>
+  <p class="summary">
+    Below are examples of three techniques used to compress raster images.<br/><br/>
 
-            <table>
-                <tr>
-                    <td>Size</td>
-                    <td>100</td>
-                </tr>
-                <tr>
-                    <td>Compression Ratio</td>
-                    <td>1.06</td>
-                </tr>
-                <tr>
-                    <td>Space saved</td>
-                    <td>1.06</td>
-                </tr>
-                <tr>
-                    <td>Peak Signal-to-Noise Ratio</td>
-                    <td>10dB</td>
-                </tr>
-            </table>
-            <button type="button" onclick="alert('Hello World!')">Click Me</button>
-        </div>
+    <i>Indexed color</i> uses a palette generated via the "median-cut" method: repeatedly find the channel with the highest
+    range and split into buckets until the desired amount of colors is reached. It may lag above 512 colors due to
+    the overhead with Javascript. At and above this threshold, the amount of colors allows for the gradient to be
+    visibly apparent, however the light source and shapes with primary colors are not properly represented until
+    2048 or more colors. This could be remedied with a method that determines palette colors via a perceptive
+    method instead of a simple median-cut. Because 24-bit color allows for 16,777,216 possible colors, using a
+    palette greatly reduces the size of many images in return for the loss of gradient information.<br/><br/>
+
+    <i>Color Quantization</i> works per-channel, and simply snaps the values of each channel to a desired number
+    of levels. For the most part, this technique can reduce color accuracy in a way that is generally
+    imperceptible and saves a significant amount of space (25% or more). The first visual issue to appear is
+    color banding on gradients, which will be present for this type of compression.<br/><br/>
+
+    The <i>Block Average</i> implementation here allows for mismatched block sizes, but does not account for it. Any
+    non-existent pixels are simply excluded, yet the full block size is expected for the final color information,
+    leading to darkened edges on the bottom and right. Preferably, I would have liked to implement padding, but I
+    believe that is outside the scope of this assignment.<br/><br/>
+  </p>
+  <div class="layout">
+    <div class="example full-row">
+      <h2>Controls</h2>
+      <label for="paletteSize" id="paletteSizeLabel">Palette size:</label>
+      <input type="range" id="paletteSize" name="paletteSize" min="1" max="12" step="1">
+      <label for="levelsPerChannel" id="levelsPerChannelLabel">Levels per channel:</label>
+      <input type="range" id="levelsPerChannel" name="levelsPerChannel" min="1" max="35">
+      <label for="blockSize" id="blockSizeLabel">Block Size:</label>
+      <input type="range" id="blockSize" name="blockSize" min="2" max="30" step="1">
     </div>
+    <script>
+      function toggleVisibility(id) {
+        let elem = document.getElementById(id);
+        if (elem)
+          elem.toggleAttribute("collapsed");
+      }
+    </script>
+    <div class="example full-row" id="sample-container">
+      <button onclick="toggleVisibility('sampleGallery')">
+        <h2>Sample Image &#8693;</h2>
+      </button>
+    </div>
+    <div class="example full-row" id="personal-container">
+      <button onclick="toggleVisibility('personalGallery')">
+        <h2>Personal Image &#8693;</h2>
+      </button>
+    </div>
+    <div class="example full-row">
+      <h2>Compression Comparison</h2>
+      <table id="comparison-table">
+        <tbody>
+        <tr style="background-color: blueviolet;">
+          <th>Image</th>
+          <th>Technique</th>
+          <th>Parameter</th>
+          <th>Size</th>
+          <th>Compression Ratio</th>
+          <th>Space Saved</th>
+          <th>PSNR</th>
+        </tr>
+        <tr>
+          <td>Sample</td>
+          <td>Original</td>
+          <td>N/A</td>
+          <td>Size</td>
+          <td>Compression Ratio</td>
+          <td>Space Saved</td>
+          <td>PSNR</td>
+        </tr>
+        <tr>
+          <td>Sample</td>
+          <td>Indexed Color</td>
+          <td>Parameter</td>
+          <td>Size</td>
+          <td>Compression Ratio</td>
+          <td>Space Saved</td>
+          <td>PSNR</td>
+        </tr>
+        <tr>
+          <td>Sample</td>
+          <td>Color Quantization</td>
+          <td>Parameter</td>
+          <td>Size</td>
+          <td>Compression Ratio</td>
+          <td>Space Saved</td>
+          <td>PSNR</td>
+        </tr>
+        <tr>
+          <td>Sample</td>
+          <td>Block Average</td>
+          <td>Parameter</td>
+          <td>Size</td>
+          <td>Compression Ratio</td>
+          <td>Space Saved</td>
+          <td>PSNR</td>
+        </tr>
+        <tr>
+          <td>Personal</td>
+          <td>Original</td>
+          <td>Parameter</td>
+          <td>Size</td>
+          <td>Compression Ratio</td>
+          <td>Space Saved</td>
+          <td>PSNR</td>
+        </tr>
+        <tr>
+          <td>Personal</td>
+          <td>Indexed Color</td>
+          <td>Parameter</td>
+          <td>Size</td>
+          <td>Compression Ratio</td>
+          <td>Space Saved</td>
+          <td>PSNR</td>
+        </tr>
+        <tr>
+          <td>Personal</td>
+          <td>Original</td>
+          <td>Color Quantization</td>
+          <td>Size</td>
+          <td>Compression Ratio</td>
+          <td>Space Saved</td>
+          <td>PSNR</td>
+        </tr>
+        <tr>
+          <td>Personal</td>
+          <td>Original</td>
+          <td>Block Average</td>
+          <td>Size</td>
+          <td>Compression Ratio</td>
+          <td>Space Saved</td>
+          <td>PSNR</td>
+        </tr>
+        </tbody>
+      </table>
+      <!-- <button type="button" onclick="alert('Hello World!')">Click Me</button> -->
+    </div>
+  </div>
 </div>
 <script type="module" src="./main.js"></script>
 </body>
