@@ -18,45 +18,54 @@
  */
 export function medianCutPalette(_imageData, _paletteSize) {
 
-  /*
-    Javascript deep copy is structuredClone.
-    Uint8ClampedArray <- TypedArray <- ArrayBuffer (array can be CONST as a buffer)
-    ImageData.data.slice() will create a shallow copy into a new buffer
-    More explicitly you can create a new array and use .set() to copy values
-    Spread Operator - const clone = [...array]
-   */
+  // TODO: Sanity check that _paletteSize is a power of two
 
-  /*
-  if (_imageData.width % 2 !== 0 || _imageData.height % 2 !== 0)
-    throw new Error("medianCutPalette: support for odd image sizes is not implemented.");
-  if (_paletteSize % 2 !== 0)
-    throw new Error("medianCutPalette: support for odd palette sizes is not implemented.");
-   */
-
-  let colors = getPixelColors(_imageData);
-
-  let channel = selectWidestChannel(_imageData);
-
-  let median = colors[Math.trunc(colors.length / 2)]
-
-
-  //console.log("Unsorted: " + JSON.stringify(colors));
-  colors.sort((a, b) => a[channel] - b[channel]);
-
-  //console.log("Sorted: " + JSON.stringify(colors));
-  throw new Error("medianCutPalette: not implemented");
+  // This function would easily recurse once pixels are in RGB array format, so it merely
+  // acts as a wrapper for MedianCutRGB()
+  return medianCutRGB(getImagePixels(_imageData), _paletteSize);
 }
 
-function getPixelColors(_imageData) {
-  let colors = [];
+
+function getImagePixels(_imageData) {
+  let pixels = [];
   for (let i = 0; i < _imageData.data.length / 4; i++) {
-    const R = _imageData.data[i];
-    const G = _imageData.data[i+1];
-    const B = _imageData.data[i+2]
-    colors.push([R,G,B]);
+    const R = _imageData.data[i*4];
+    const G = _imageData.data[i*4+1];
+    const B = _imageData.data[i*4+2]
+    pixels.push([R,G,B]);
   }
 
-  return colors;
+  return pixels;
+}
+
+function medianCutRGB(pixels, _paletteSize) {
+  // Return average color of single boxes, simple sum and divide
+  if (_paletteSize === 1 || pixels.length === 1)
+  {
+    let R = 0;
+    let G = 0;
+    let B = 0;
+    for (let i = 0; i < pixels.length; i++) {
+      R += pixels[i][0];
+      G += pixels[i][1];
+      B += pixels[i][2];
+    }
+
+    R = Math.trunc(R/pixels.length);
+    G = Math.trunc(G/pixels.length);
+    B = Math.trunc(B/pixels.length);
+
+    return [[R,G,B]];
+  }
+
+  let channel = selectWidestChannel(pixels);
+  pixels.sort((a, b) => a[channel] - b[channel]);
+  const median = Math.trunc(pixels.length / 2);
+
+  return [
+    ...medianCutRGB(pixels.slice(0, median), _paletteSize / 2),
+    ...medianCutRGB(pixels.slice(median), _paletteSize / 2)
+  ];
 }
 
 /**
@@ -92,9 +101,25 @@ function selectWidestChannel(pixels) {
 
 /** Index of the palette entry closest to `color` in RGB Euclidean distance. */
 export function nearestPaletteIndex(_color, _palette) {
+  if (_palette.length === 0)
+    return 0;
 
-  // dist = sqrt( (r1-r2)^2 + (g1-g2)^2...
-  throw new Error("nearestPaletteIndex: not implemented");
+  let maxDist = 999;
+  let index = -1;
+  for (let i = 0; i < _palette.length; i++) {
+    const dist = Math.sqrt(
+        (_color[0]-_palette[i][0])**2 +
+        (_color[1]-_palette[i][1])**2 +
+        (_color[2]-_palette[i][2])**2 );
+
+    if (dist > maxDist)
+      continue;
+
+    maxDist = dist;
+    index = i;
+  }
+
+  return index;
 }
 
 /**
@@ -102,9 +127,20 @@ export function nearestPaletteIndex(_color, _palette) {
  * @returns {{ imageData: ImageData, indices: Uint8Array }}
  */
 export function applyPalette(_imageData, _palette) {
-  let indices = new Uint8Array(_imageData.length() % 4);
+  const data = new Uint8ClampedArray(_imageData.data);
+  let indices = new Uint8Array(data.length);
 
-  return { imageData: _imageData, indices: indices };
+  for (let i = 0; i < data.length / 4; i++) {
+    const color = [_imageData.data[i*4],_imageData.data[i*4+1],_imageData.data[i*4+2]];
+    let index = nearestPaletteIndex(color, _palette);
+
+    indices[i] = index;
+    data[i*4] = _palette[index][0];
+    data[i*4+1] = _palette[index][1];
+    data[i*4+2] = _palette[index][2];
+  }
+
+  return { imageData: new ImageData(data, _imageData.width, _imageData.height), indices: indices };
 
   // throw new Error("applyPalette: not implemented");
 }

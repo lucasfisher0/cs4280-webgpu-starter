@@ -6,44 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml"
           href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23020617'/%3E%3Cpolygon points='16,7 26,25 6,25' fill='%2338bdf8'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/style.css" />     <!-- ROOT STYLESHEET -->
+    <link rel="stylesheet" href="./style.css" />    <!-- LOCAL STYLESHEET -->
     <title>CS 4280 · Assignment 1</title>
-
 </head>
-
-<style>
-    .page {
-        max-width: 90rem;
-    }
-    .full-row {
-        flex: 1 1 100%;
-    }
-    .gallery {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        width: 100%;
-    }
-    .gallery .canvas-frame {
-        flex: 0 0 auto;
-        min-height: 0;
-        height: auto;
-    }
-    .gallery .imagebox {
-        display: flex;
-        flex-direction: column;
-        padding: 1rem;
-    }
-    .comparison-table tbody tr:nth-child(2n) {
-        background-color: #555555;
-    }
-    .comparison-table tbody tr:nth-child(2n+1) {
-        background-color: #5f5f5f;
-    }
-    .comparison-table tbody tr {
-        text-align: center;
-    }
-</style>
 
 <body>
 <div class="page">
@@ -55,14 +21,22 @@
         information.
     </p>
     <div class="layout">
-        <div class="example full-row">
+        <div class="example">
+            <p class="summary">
+                Below are two complete, runnable examples: a plain Canvas 2D example showing Earth and its Moon orbiting the Sun,
+                and a simple WebGPU example that renders a triangle and demonstrates the complete graphics pipeline. Both examples
+                are intended as starting points for upcoming assignments. See this project's <code>README.md</code> for more
+                information.
+            </p>
+        </div>
+        <div class="example">
             <h2>Controls</h2>
                 <label for="paletteSize" id="paletteSizeLabel">Palette size:</label>
-                <input type="range" id="paletteSize" name="paletteSize" min="0" max="100" value="50" step="1">
+                <input type="range" id="paletteSize" name="paletteSize" min="0" max="9" step="1">
                 <label for="levelsPerChannel" id="levelsPerChannelLabel">Levels per channel:</label>
-                <input type="range" id="levelsPerChannel" name="levelsPerChannel" min="0" max="100" value="50" step="1">
+                <input type="range" id="levelsPerChannel" name="levelsPerChannel" min="0" max="100">
                 <label for="blockSize" id="blockSizeLabel">Block Size:</label>
-                <input type="range" id="blockSize" name="blockSize" min="0" max="10" value="10" step="2">
+                <input type="range" id="blockSize" name="blockSize" min="0" max="10" step="2">
         </div>
         <div class="example full-row" id="sample-container">
             <h2>Sample Image</h2>
