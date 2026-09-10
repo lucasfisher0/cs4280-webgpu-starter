@@ -17,14 +17,8 @@
  * @returns {number[][]} array of `[r, g, b]` palette colors
  */
 export function medianCutPalette(_imageData, _paletteSize) {
-
-  // TODO: Sanity check that _paletteSize is a power of two
-
-  // This function would easily recurse once pixels are in RGB array format, so it merely
-  // acts as a wrapper for MedianCutRGB()
   return medianCutRGB(getImagePixels(_imageData), _paletteSize);
 }
-
 
 function getImagePixels(_imageData) {
   let pixels = [];
@@ -38,6 +32,15 @@ function getImagePixels(_imageData) {
   return pixels;
 }
 
+/**
+ * Builds a `paletteSize`-color palette of an RGB `pixels` array by recursively
+ * splitting the most color-varied "box" of pixels in half (at its median,
+ * along its widest channel) until there are enough boxes, then averaging
+ * each box into one representative color.
+ * @param pixels
+ * @param _paletteSize
+ * @returns {number[][]} array of `[r, g, b]` palette colors, or a single
+ */
 function medianCutRGB(pixels, _paletteSize) {
   // Return average color of single boxes, simple sum and divide
   if (_paletteSize === 1 || pixels.length === 1)
