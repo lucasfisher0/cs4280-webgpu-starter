@@ -241,8 +241,7 @@ function updateDataTable(_originalImage, _modifiedImage, tableId, control) {
     keyElem.innerText = tableKeys[i];
     rowElem.appendChild(keyElem);
     const valueElem = document.createElement("td");
-    switch (i)
-    {
+    switch (i) {
       case 0:
         valueElem.innerText = `${Math.round(tableValues[i])} bytes`;
         break;
