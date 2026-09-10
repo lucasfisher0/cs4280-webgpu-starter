@@ -1,9 +1,8 @@
-import {describe, expect, test} from 'vitest'
-import {encodePPM} from './ppm';
+import { describe, expect, test } from "vitest";
+import { encodePPM } from "./ppm";
 
-describe('PPM Encoding', () => {
-
-  test('Matches given example', () => {
+describe("PPM Encoding", () => {
+  test("Matches given example", () => {
     const col1 = [255, 0, 0, 255];
     const col2 = [0, 255, 0, 255];
 

@@ -19,13 +19,12 @@ export function meanSquaredError(_original, _compressed) {
   let MSE = 0;
 
   for (let i = 0; i < _original.data.length; i++) {
-    if ((i + 1) % 4 === 0)
-      continue;
+    if ((i + 1) % 4 === 0) continue;
 
     MSE += (_original.data[i] - _compressed.data[i]) ** 2;
   }
 
-  return MSE / _original.data.length * 0.75; // 0.75 represents 3/4 channels, hence 3/4 the bytes
+  return (MSE / _original.data.length) * 0.75; // 0.75 represents 3/4 channels, hence 3/4 the bytes
 }
 
 /**

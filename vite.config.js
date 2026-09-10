@@ -10,10 +10,7 @@ import { defineConfig } from "vite";
 // assignments/ are currently just placeholder folders (see their
 // README.md) — add an entry here (e.g. "activities/week03-transforms/
 // index.html") for each one as it gets built.
-const pages = [
-    "index.html",
-    "assignments/a1-image-compression/index.html"
-];
+const pages = ["index.html", "assignments/a1-image-compression/index.html"];
 
 // https://vite.dev/config/
 export default defineConfig({

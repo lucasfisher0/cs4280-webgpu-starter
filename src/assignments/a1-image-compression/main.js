@@ -1,26 +1,29 @@
-import photoUrl from "./my-photo.jpg"
-import {imageDataFromSource} from "@/lib/image/loadImage.js";
-import {createSampleImage} from "@/lib/image/sampleImage.js";
-import {averageBlocks} from "@/lib/image/blockAverage.js";
-import {medianCutPalette, applyPalette} from "@/lib/image/palette.js";
-import {posterizeChannels} from '@/lib/image/quantize.js';
-import {encodePPM, downloadBytes} from '@/lib/image/ppm.js';
+import { averageBlocks } from "@/lib/image/blockAverage.js";
+import { psnr } from "@/lib/image/compare.js";
+import { imageDataFromSource } from "@/lib/image/loadImage.js";
+import { applyPalette, medianCutPalette } from "@/lib/image/palette.js";
+import { downloadBytes, encodePPM } from "@/lib/image/ppm.js";
+import { posterizeChannels } from "@/lib/image/quantize.js";
+import { createSampleImage } from "@/lib/image/sampleImage.js";
 import {
-  rawStorageBytes, paletteStorageBytes, quantizedStorageBytes, blockStorageBytes,
-  compressionRatio, formatBytes
-} from '@/lib/image/storage.js';
-import {psnr} from '@/lib/image/compare.js';
+  blockStorageBytes,
+  compressionRatio,
+  formatBytes,
+  paletteStorageBytes,
+  quantizedStorageBytes,
+  rawStorageBytes,
+} from "@/lib/image/storage.js";
+import photoUrl from "./my-photo.jpg";
 
-
-const IMAGE_SIZE = 320 // size in px
+const IMAGE_SIZE = 320; // size in px
 
 //#region Controls
 const CONTROLS = ["paletteSize", "levelsPerChannel", "blockSize"];
-let controlLabels = {};
-let controlValues = {
-  "paletteSize": 4,
-  "levelsPerChannel": 20,
-  "blockSize": 10
+const controlLabels = {};
+const controlValues = {
+  paletteSize: 4,
+  levelsPerChannel: 20,
+  blockSize: 10,
 };
 
 let palette = null;
@@ -33,8 +36,8 @@ function setupControls() {
 
     const elem = document.getElementById(control);
     elem.value = controlValues[control];
-    elem.addEventListener('input', event => onControlInput(control, event.target.value));
-    elem.addEventListener('change', () => onControlChanged(control));
+    elem.addEventListener("input", (event) => onControlInput(control, event.target.value));
+    elem.addEventListener("change", () => onControlChanged(control));
     onControlInput(control, controlValues[control]);
     onControlChanged(control); // Set labels to initial values
   }
@@ -69,12 +72,12 @@ function onControlChanged(name) {
   const controlChangedEvent = new CustomEvent("controlChanged", {
     detail: {
       control: name,
-      value: controlValues[name]
-    }
+      value: controlValues[name],
+    },
   });
 
-  const canvases = document.querySelectorAll('canvas')
-  canvases.forEach((canvas) => canvas.dispatchEvent(controlChangedEvent));
+  const canvases = document.querySelectorAll("canvas");
+  canvases.forEach(() => canvas.dispatchEvent(controlChangedEvent));
   updateComparisonTable();
 }
 
@@ -100,54 +103,47 @@ function getSampleImage() {
 const IMAGE_MODIFIERS = [
   {
     title: "Original",
-    fn: function (_imageData) {
-      return _imageData;
-    },
-    showDownload: true
+    fn: (_imageData) => _imageData,
+    showDownload: true,
   },
   {
     title: "Indexed Color",
     control: "paletteSize",
-    fn: function (_imageData) {
+    fn: (_imageData) => {
       palette = medianCutPalette(_imageData, controlValues["paletteSize"]);
       return applyPalette(_imageData, palette).imageData;
-    }
+    },
   },
   {
     title: "Color Quantization",
     control: "levelsPerChannel",
-    fn: function (_imageData) {
-      return posterizeChannels(_imageData, controlValues["levelsPerChannel"]);
-    }
+    fn: (_imageData) => posterizeChannels(_imageData, controlValues["levelsPerChannel"]),
   },
   {
     title: "Block Average",
     control: "blockSize",
-    fn: function (_imageData) {
-      return averageBlocks(_imageData, controlValues["blockSize"]);
-    }
-  }
-]
-let imageTables = [];
+    fn: (_imageData) => averageBlocks(_imageData, controlValues["blockSize"]),
+  },
+];
 
 function buildGallery(imageData, galleryTitle) {
-  let sectionContainer = document.getElementById(`${galleryTitle}-container`);
-  let gallery = document.createElement("div");
+  const sectionContainer = document.getElementById(`${galleryTitle}-container`);
+  const gallery = document.createElement("div");
   gallery.id = `${galleryTitle}Gallery`;
   gallery.classList.add("gallery");
   gallery.classList.add("collapsible");
   sectionContainer.append(gallery);
 
   for (const MODIFIER of IMAGE_MODIFIERS) {
-    let container = document.createElement("div");
+    const container = document.createElement("div");
     container.classList.add("imagebox");
     gallery.append(container);
 
-    let title = document.createElement("h3")
+    const title = document.createElement("h3");
     title.innerText = MODIFIER.title;
     container.append(title);
 
-    let frame = document.createElement("div");
+    const frame = document.createElement("div");
     frame.classList.add("canvas-frame");
     container.append(frame);
 
@@ -162,7 +158,7 @@ function buildGallery(imageData, galleryTitle) {
     downloadButton.innerText = "Download";
     downloadButton.type = "button";
     downloadButton.dataset.downloadTarget = `${galleryTitle}-${MODIFIER.title}`;
-    downloadButton.addEventListener('click', (event) => {
+    downloadButton.addEventListener("click", (event) => {
       downloadImage(event.currentTarget.dataset["downloadTarget"]);
     });
     container.append(downloadButton);
@@ -172,21 +168,19 @@ function buildGallery(imageData, galleryTitle) {
     container.append(table);
 
     const modImageData = MODIFIER.fn(imageData);
-    updateDataTable(imageData, modImageData, table.id, MODIFIER.control ?? "baseline")
+    updateDataTable(imageData, modImageData, table.id, MODIFIER.control ?? "baseline");
     const ctx = canvas.getContext("2d");
     ctx.putImageData(modImageData, 0, 0);
-
 
     // Update Listener
     canvas.dataset.base = `canvas-${galleryTitle}-Original`;
     canvas.dataset.tableId = `statistics-${galleryTitle}-${MODIFIER.control ?? "baseline"}`;
     canvas.dataset.control = MODIFIER.control;
-    canvas.addEventListener('controlChanged', (event) => {
+    canvas.addEventListener("controlChanged", (event) => {
       if (event.target.dataset.control === event.detail.control) {
         console.log("Refreshing for modifier: " + event.detail.control);
-        const MODIFIER = IMAGE_MODIFIERS.find(x => x.control === event.target.dataset.control);
+        const MODIFIER = IMAGE_MODIFIERS.find((x) => x.control === event.target.dataset.control);
         if (MODIFIER) {
-
           const canvas = document.getElementById(event.target.dataset.base);
           if (!canvas) {
             console.warn("Failed to retrieve baseline image for controls update.");
@@ -195,7 +189,12 @@ function buildGallery(imageData, galleryTitle) {
 
           const baseImageData = canvas.getContext("2d").getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE);
           const modImageData = MODIFIER.fn(baseImageData);
-          updateDataTable(baseImageData, modImageData, event.target.dataset.tableId, event.target.dataset.control ?? "baseline");
+          updateDataTable(
+            baseImageData,
+            modImageData,
+            event.target.dataset.tableId,
+            event.target.dataset.control ?? "baseline",
+          );
 
           const ctx = event.target.getContext("2d");
           ctx.putImageData(modImageData, 0, 0);
@@ -206,52 +205,65 @@ function buildGallery(imageData, galleryTitle) {
 }
 
 function updateDataTable(_originalImage, _modifiedImage, tableId, control) {
-
   const table = document.getElementById(tableId);
   table.replaceChildren();
 
-  let sizeRaw = rawStorageBytes(_originalImage.width, _originalImage.height);
+  const sizeRaw = rawStorageBytes(_originalImage.width, _originalImage.height);
 
   let size;
   switch (control) {
     case "paletteSize":
-      size = paletteStorageBytes(_modifiedImage.width, _modifiedImage.height, controlValues["paletteSize"]);
+      size = paletteStorageBytes(
+        _modifiedImage.width,
+        _modifiedImage.height,
+        controlValues["paletteSize"],
+      );
       break;
     case "levelsPerChannel":
-      size = quantizedStorageBytes(_modifiedImage.width, _modifiedImage.height, controlValues["levelsPerChannel"]);
+      size = quantizedStorageBytes(
+        _modifiedImage.width,
+        _modifiedImage.height,
+        controlValues["levelsPerChannel"],
+      );
       break;
     case "blockSize":
-      size = blockStorageBytes(_modifiedImage.width, _modifiedImage.height, controlValues["blockSize"]);
+      size = blockStorageBytes(
+        _modifiedImage.width,
+        _modifiedImage.height,
+        controlValues["blockSize"],
+      );
       break;
     case "baseline":
     default:
       size = sizeRaw;
   }
 
-  let ratio = compressionRatio(sizeRaw, size);
-  let spaceSaved = (1 - size / sizeRaw) * 100;
-  let psnRatio = psnr(_originalImage, _modifiedImage);
+  const ratio = compressionRatio(sizeRaw, size);
+  const spaceSaved = (1 - size / sizeRaw) * 100;
+  const psnRatio = psnr(_originalImage, _modifiedImage);
 
   // Create Table
   const tableKeys = ["Size", "Compression Ratio", "Space saved", "Peak Signal-to-Noise Ratio"];
   const tableValues = [size, ratio, spaceSaved, psnRatio];
   for (let i = 0; i < tableKeys.length; i++) {
     const rowElem = document.createElement("tr");
-    const keyElem = document.createElement("td")
+    const keyElem = document.createElement("td");
     keyElem.innerText = tableKeys[i];
     rowElem.appendChild(keyElem);
     const valueElem = document.createElement("td");
     switch (i) {
       case 0:
-        valueElem.innerText = `${Math.round(tableValues[i])} bytes`;
-        break;
+        valueElem.innerText = formatBytes(tableValues[i]);
+           break;
       case 2:
         valueElem.innerText = `${tableValues[i].toFixed(2)}%`;
         break;
       case 1:
       case 3:
       default:
-        valueElem.innerText = isNaN(tableValues[i]) ? tableValues[i] : Number(tableValues[i]).toFixed(4);
+        valueElem.innerText = isNaN(tableValues[i])
+          ? tableValues[i]
+          : Number(tableValues[i]).toFixed(4);
     }
 
     rowElem.appendChild(valueElem);
@@ -259,18 +271,16 @@ function updateDataTable(_originalImage, _modifiedImage, tableId, control) {
   }
 }
 
-
 function updateComparisonTable() {
-
   const table = document.getElementById("comparison-table");
   for (const imgType of ["sample", "personal"]) {
     for (const modifier of IMAGE_MODIFIERS) {
-
       try {
         // Select Values from Image Statistics
-        const imgTable = document.getElementById(`statistics-${imgType}-${modifier.control ?? "baseline"}`);
-        if (!imgTable)
-          continue;
+        const imgTable = document.getElementById(
+          `statistics-${imgType}-${modifier.control ?? "baseline"}`,
+        );
+        if (!imgTable) continue;
 
         let parameter;
         switch (modifier.control) {
@@ -286,20 +296,16 @@ function updateComparisonTable() {
           default:
             parameter = "N/A";
         }
-        let size = imgTable.children[0].children[1].innerText;
-        let compressionRatio = imgTable.children[1].children[1].innerText;
-        let spaceSaved = imgTable.children[2].children[1].innerText;
-        let PSNR = imgTable.children[3].children[1].innerText;
-
+        const size = imgTable.children[0].children[1].innerText;
+        const compressionRatio = imgTable.children[1].children[1].innerText;
+        const spaceSaved = imgTable.children[2].children[1].innerText;
+        const PSNR = imgTable.children[3].children[1].innerText;
 
         // Select row of Comparison Table
         let offset = imgType === "personal" ? 5 : 1;
-        if (modifier.control === "paletteSize")
-          offset += 1;
-        else if (modifier.control === "levelsPerChannel")
-          offset += 2;
-        else if (modifier.control === "blockSize")
-          offset += 3;
+        if (modifier.control === "paletteSize") offset += 1;
+        else if (modifier.control === "levelsPerChannel") offset += 2;
+        else if (modifier.control === "blockSize") offset += 3;
         const tableRow = table.children[0].children[offset];
 
         tableRow.children[2].innerText = parameter;
@@ -314,12 +320,10 @@ function updateComparisonTable() {
   }
 }
 
-
 function downloadImage(targetId) {
   try {
     const canvas = document.getElementById(`canvas-${targetId}`);
-    if (!canvas)
-      throw new Error(`Unable to retrieve canvas element with id 'canvas-${targetId}'.`);
+    if (!canvas) throw new Error(`Unable to retrieve canvas element with id 'canvas-${targetId}'.`);
     const filename = `${targetId.toLowerCase()}.ppm`;
     const ctx = canvas.getContext("2d");
     const img = ctx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE);
@@ -331,23 +335,22 @@ function downloadImage(targetId) {
 }
 
 async function main() {
-
   setupControls();
 
   const sampleImage = getSampleImage();
   buildGallery(sampleImage, "sample");
 
   const personalImage = await getPersonalImage();
-  if (typeof (personalImage) !== "string") {
+  if (typeof personalImage !== "string") {
     buildGallery(personalImage, "personal");
   } else {
-    let sectionContainer = document.getElementById(`personal-container`);
-    let errorText = document.createElement("p");
+    const sectionContainer = document.getElementById(`personal-container`);
+    const errorText = document.createElement("p");
     errorText.innerText = personalImage;
     sectionContainer.append(errorText);
   }
 
-  await new Promise(resolve => setTimeout(resolve, 200)); // wait 200ms before rebuilding the initial comparison table
+  await new Promise((resolve) => setTimeout(resolve, 200)); // wait 200ms before rebuilding the initial comparison table
   updateComparisonTable();
 }
 

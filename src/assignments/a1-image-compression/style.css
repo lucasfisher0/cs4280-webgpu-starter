@@ -42,11 +42,10 @@
 #comparison-table > tbody > tr:nth-child(2n) {
   background-color: rgb(255 255 255 / 0.25);
 }
-#comparison-table > tbody > tr:nth-child(2n+1) {
+#comparison-table > tbody > tr:nth-child(2n + 1) {
   background-color: rgb(255 255 255 / 0.2);
 }
 
 .comparison-table tbody tr {
   text-align: center;
 }
-

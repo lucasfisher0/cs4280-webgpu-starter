@@ -10,32 +10,29 @@
  * @returns {ImageData}
  */
 export function averageBlocks(_imageData, _blockSize) {
+  if (_blockSize <= 1) return _imageData;
 
-  if (_blockSize <= 1)
-    return _imageData;
-
-  let blocks_vertical = Math.ceil(_imageData.height / _blockSize);
-  let blocks_horizontal = Math.ceil(_imageData.width / _blockSize);
-  let pixels = new Uint8ClampedArray(_imageData.data);
+  const blocks_vertical = Math.ceil(_imageData.height / _blockSize);
+  const blocks_horizontal = Math.ceil(_imageData.width / _blockSize);
+  const pixels = new Uint8ClampedArray(_imageData.data);
 
   for (let by = 0; by < blocks_vertical; by++) {
     for (let bx = 0; bx < blocks_horizontal; bx++) {
-
       // Iterate block lines
-      let R = 0, G = 0, B = 0;
-      let blockOffset = (by * _blockSize * _imageData.width * 4) + (bx * _blockSize * 4);
+      let R = 0,
+        G = 0,
+        B = 0;
+      const blockOffset = by * _blockSize * _imageData.width * 4 + bx * _blockSize * 4;
       for (let cy = 0; cy < _blockSize; cy++) {
-        let offset = blockOffset + (cy * _imageData.width * 4);
-        if (offset >= _imageData.data.length)
-          break;
+        const offset = blockOffset + cy * _imageData.width * 4;
+        if (offset >= _imageData.data.length) break;
 
         for (let cx = 0; cx < _blockSize; cx++) {
-          if (offset + (cx * 4) % (_imageData.width * 4) === 0)
-            continue;
+          if (offset + ((cx * 4) % (_imageData.width * 4)) === 0) continue;
 
-          R += pixels[offset + (cx * 4)];
-          G += pixels[offset + (cx * 4) + 1];
-          B += pixels[offset + (cx * 4) + 2];
+          R += pixels[offset + cx * 4];
+          G += pixels[offset + cx * 4 + 1];
+          B += pixels[offset + cx * 4 + 2];
         }
       }
 
@@ -45,17 +42,15 @@ export function averageBlocks(_imageData, _blockSize) {
 
       // Apply average color
       for (let cy = 0; cy < _blockSize; cy++) {
-        let offset = blockOffset + (cy * _imageData.width * 4);
-        if (offset >= _imageData.data.length)
-          break;
+        const offset = blockOffset + cy * _imageData.width * 4;
+        if (offset >= _imageData.data.length) break;
 
         for (let cx = 0; cx < _blockSize; cx++) {
-          if (offset + (cx * 4) % (_imageData.width * 4) === 0)
-            continue;
+          if (offset + ((cx * 4) % (_imageData.width * 4)) === 0) continue;
 
-          pixels[offset + (cx * 4)] = R;
-          pixels[offset + (cx * 4) + 1] = G;
-          pixels[offset + (cx * 4) + 2] = B;
+          pixels[offset + cx * 4] = R;
+          pixels[offset + cx * 4 + 1] = G;
+          pixels[offset + cx * 4 + 2] = B;
         }
       }
     }
