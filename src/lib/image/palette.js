@@ -82,7 +82,7 @@ function selectWidestChannel(pixels) {
     let min = 255;
     let max = 0;
 
-    for (let ix = 0; i < pixels.length; i++) {
+    for (let ix = 0; ix < pixels.length; ix++) {
       const val = pixels[ix][i];
       if (val < min) min = val;
       if (val > max) max = val;
@@ -95,6 +95,7 @@ function selectWidestChannel(pixels) {
     maxWidth = width;
   }
 
+  console.log(`Cutting channel ${channel} with width: ${maxWidth}`);
   return channel;
 }
 
