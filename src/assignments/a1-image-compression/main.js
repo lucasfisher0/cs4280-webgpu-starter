@@ -13,7 +13,7 @@ import {
   quantizedStorageBytes,
   rawStorageBytes,
 } from "@/lib/image/storage.js";
-import photoUrl from "./my-photo.jpg";
+import photoUrl from "./my-photo.png";
 
 const IMAGE_SIZE = 320; // size in px
 
@@ -77,7 +77,7 @@ function onControlChanged(name) {
   });
 
   const canvases = document.querySelectorAll("canvas");
-  canvases.forEach(() => canvas.dispatchEvent(controlChangedEvent));
+  canvases.forEach((canvas) => canvas.dispatchEvent(controlChangedEvent));
   updateComparisonTable();
 }
 
