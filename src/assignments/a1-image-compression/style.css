@@ -1,0 +1,51 @@
+:root {
+  interpolate-size: allow-keywords;
+}
+
+.page {
+  max-width: 90rem;
+}
+
+.full-row {
+  flex: 1 1 100%;
+}
+
+.collapsible {
+  height: auto;
+  overflow: hidden;
+  transition: height 0.3s ease-in-out;
+}
+
+.collapsible[collapsed] {
+  height: 0;
+}
+
+.gallery {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.gallery .canvas-frame {
+  flex: 0 0 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.gallery .imagebox {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+#comparison-table > tbody > tr:nth-child(2n) {
+  background-color: rgb(255 255 255 / 0.25);
+}
+#comparison-table > tbody > tr:nth-child(2n + 1) {
+  background-color: rgb(255 255 255 / 0.2);
+}
+
+.comparison-table tbody tr {
+  text-align: center;
+}
