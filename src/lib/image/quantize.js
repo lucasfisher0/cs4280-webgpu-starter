@@ -9,7 +9,10 @@
 
 /** Snaps one 0-255 channel value to the nearest of `levels` evenly spaced steps. */
 export function quantizeChannel(_value, _levels) {
-  throw new Error("quantizeChannel: not implemented");
+  const stepSize = Math.round(255 / _levels);
+
+  const step = Math.round(_value / stepSize);
+  return Math.min(step * stepSize, 255);
 }
 
 /**
@@ -21,5 +24,15 @@ export function quantizeChannel(_value, _levels) {
  * @returns {ImageData}
  */
 export function posterizeChannels(_imageData, _levelsPerChannel) {
-  throw new Error("posterizeChannels: not implemented");
+  const pixels = new Uint8ClampedArray(_imageData.data);
+
+  for (let i = 0; i < pixels.length; i++) {
+    if ((i + 1) % 4 === 0)
+      // Skip alpha channel
+      continue;
+
+    pixels[i] = quantizeChannel(pixels[i], _levelsPerChannel);
+  }
+
+  return new ImageData(pixels, _imageData.width, _imageData.height);
 }
