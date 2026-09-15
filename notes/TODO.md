@@ -11,3 +11,9 @@
 - [ ] Local axis guides (second pipeline sharing the cube's MVP/bind group, correct depth occlusion)
 - [ ] Code quality (RUN LINTER BEFORE SUBMISSION!)
 - [ ] Post-submission questions
+
+
+Local -> World -> View -> NDC (Normalized Device Coordinates)
+
+
+* WebGPU is left-handed. NDC map Z from 0.0 near to 1.0 far
