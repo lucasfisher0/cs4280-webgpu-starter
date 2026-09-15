@@ -6,10 +6,6 @@
   max-width: 90rem;
 }
 
-.full-row {
-  flex: 1 1 100%;
-}
-
 .collapsible {
   height: auto;
   overflow: hidden;

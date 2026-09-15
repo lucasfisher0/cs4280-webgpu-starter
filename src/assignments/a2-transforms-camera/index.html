@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23020617'/%3E%3Cpolygon points='16,7 26,25 6,25' fill='%2338bdf8'/%3E%3C/svg%3E"/>
+  <link rel="stylesheet" href="/style.css"/>     <!-- ROOT STYLESHEET -->
+  <link rel="stylesheet" href="./style.css"/>    <!-- LOCAL STYLESHEET -->
+  <title>Assignment 2 — Transforms &amp; Camera · CS 4280</title>
+</head>
+
+<body>
+<div class="page">
+  <a class="back-link" href="/">← Back to course home</a>
+  <h1>Assignment 2 — Transforms &amp; Camera</h1>
+  <p class="summary">
+    Wire up your own WebGPU pipeline: a cube driven by a model/view/projection matrix built
+    from <code>lib/math/transforms.js</code>, with an orbit camera controlled by dragging the
+    canvas. See the assignment handout for the full spec.
+  </p>
+  <div class="layout">
+    <div class="canvas-frame drag-surface" id="canvasFrame">
+      <canvas id="canvas"></canvas>
+      <p id="status" class="status-overlay" hidden></p>
+    </div>
+    <div class="controls">
+      <h3>Transform &amp; Camera Controls</h3>
+      <label>
+        <span class="row"><span>Camera distance</span><span class="row-value" id="distanceValue">5.0</span></span>
+        <input id="distance" type="range" min="2" max="12" step="0.1" value="5"/>
+      </label>
+      <label>
+        <span class="row"><span>Object scale</span><span class="row-value" id="scaleValue">1.00×</span></span>
+        <input id="scale" type="range" min="0.3" max="2" step="0.05" value="1"/>
+      </label>
+      <label>
+        <span class="row"><span>Shear X</span><span class="row-value" id="shearXValue">0.00</span></span>
+        <input id="shearX" type="range" min="-1" max="1" step="0.05" value="0"/>
+      </label>
+      <label>
+        <span class="row"><span>Shear Y</span><span class="row-value" id="shearYValue">0.00</span></span>
+        <input id="shearY" type="range" min="-1" max="1" step="0.05" value="0"/>
+      </label>
+      <label>
+        <span class="row"><span>Shear Z</span><span class="row-value" id="shearZValue">0.00</span></span>
+        <input id="shearZ" type="range" min="-1" max="1" step="0.05" value="0"/>
+      </label>
+      <button id="spinBtn" class="toggle" type="button" aria-pressed="true">
+        Auto-spin: On
+      </button>
+    </div>
+  </div>
+</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

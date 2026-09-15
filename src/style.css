@@ -111,3 +111,9 @@ canvas {
 .example .canvas-frame {
   margin-top: 0.25rem;
 }
+
+/* ---- Custom styling ---- */
+
+.full-row {
+  flex: 1 1 100%;
+}

@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -8,18 +7,20 @@
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23020617'/%3E%3Cpolygon points='16,7 26,25 6,25' fill='%2338bdf8'/%3E%3C/svg%3E"/>
   <link rel="stylesheet" href="/style.css"/>     <!-- ROOT STYLESHEET -->
   <link rel="stylesheet" href="./style.css"/>    <!-- LOCAL STYLESHEET -->
-  <title>CS 4280 · Assignment 1</title>
+  <title>Assignment 1 — Image Compression · CS 4280</title>
 </head>
 
 <body>
 <div class="page">
-  <h1>CS 4280 · Assignment 1</h1>
+  <a class="back-link" href="/">← Back to course home</a>
+  <h1>Assignment 1 - Image Compression</h1>
   <p class="summary">
     Below are examples of three techniques used to compress raster images.<br/><br/>
 
-    <i>Indexed color</i> uses a palette generated via the "median-cut" method: repeatedly find the channel with the highest
+    <i>Indexed color</i> uses a palette generated via the "median-cut" method: repeatedly find the channel with the
+    highest
     range and split into buckets until the desired amount of colors is reached. It may lag above 512 colors due to
-    the overhead with Javascript. At and above this threshold, the amount of colors allows for the gradient to be
+    the overhead with JavaScript. At and above this threshold, the amount of colors allows for the gradient to be
     visibly apparent, however the light source and shapes with primary colors are not properly represented until
     2048 or more colors. This could be remedied with a method that determines palette colors via a perceptive
     method instead of a simple median-cut. Because 24-bit color allows for 16,777,216 possible colors, using a
@@ -53,14 +54,18 @@
       }
     </script>
     <div class="example full-row" id="sample-container">
-      <button type="button" onclick="toggleVisibility('sampleGallery')">
-        <h2>Sample Image &#8693;</h2>
-      </button>
+      <h2>
+        <button type="button" onclick="toggleVisibility('sampleGallery')">
+          Sample Image &#8693;
+        </button>
+      </h2>
     </div>
     <div class="example full-row" id="personal-container">
-      <button type="button" onclick="toggleVisibility('personalGallery')">
-        <h2>Personal Image &#8693;</h2>
-      </button>
+      <h2>
+        <button type="button" onclick="toggleVisibility('personalGallery')">
+          Personal Image &#8693;
+        </button>
+      </h2>
     </div>
     <div class="example full-row">
       <h2>Compression Comparison</h2>
