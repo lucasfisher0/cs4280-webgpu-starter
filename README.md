@@ -38,7 +38,7 @@ examples directly.
 | Script | Does |
 |---|---|
 | `npm run dev` | Start the Vite dev server. |
-| `npm run build` | Production build to `dist/` (every page listed in `vite.config.js`'s `pages` array). |
+| `npm run build` | Production build to `dist/` (every page listed in `vite.config.ts`'s `pages` array). |
 | `npm run preview` | Serve the production build locally. |
 | `npm run test` | Run vitest. |
 | `npm run lint` | Check formatting/lint rules with Biome. |
@@ -48,7 +48,7 @@ examples directly.
 ## Project structure
 
 ```
-vite.config.js                 # lists every page for `npm run build`; sets `root: "src"`
+vite.config.ts                 # lists every page for `npm run build`; sets `root: "src"`
 biome.json                       # lint/format config
 
 src/
@@ -66,7 +66,7 @@ src/
 └── assignments/    # placeholder — one .keep file, nothing else yet
 ```
 
-Everything Vite serves/bundles lives under `src/`; `vite.config.js`,
+Everything Vite serves/bundles lives under `src/`; `vite.config.ts`,
 `package.json`, `biome.json`, and the rest of the tooling config stay at
 the project root, outside it. The `@` import alias points at `src/`, so
 `@/lib/webgpu/context.js` resolves to `src/lib/webgpu/context.js`.
@@ -109,7 +109,7 @@ There's no router and no shared page-registry file:
    — see `src/hello-triangle.js`/`src/hello-triangle.wgsl` and
    `src/hello-canvas2d.js` for the shape to follow, and `src/lib/` for
    what infrastructure is already available to import.
-2. Add the new page's path to the `pages` array in `vite.config.js` (a
+2. Add the new page's path to the `pages` array in `vite.config.ts` (a
    path relative to `src/`, e.g. `"activities/week03-transforms/
    index.html"`), so `npm run build` includes it.
 

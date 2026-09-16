@@ -1,5 +1,6 @@
 import {fileURLToPath, URL} from "node:url";
 import {defineConfig} from "vite";
+import path from 'path';
 
 // A plain multi-page site: every activity/assignment gets its own HTML page
 // (own <script type="module" src="./main.js">), not a single-page app with
@@ -10,19 +11,29 @@ import {defineConfig} from "vite";
 // assignments/ are currently just placeholder folders (see their
 // README.md) — add an entry here (e.g. "activities/week03-transforms/
 // index.html") for each one as it gets built.
-const pages = ["index.html", "assignments/a1-image-compression/index.html", "assignments/a2-transforms-camera/index.html"];
+const pages = [
+  "index.html",
+  "assignments/a1-image-compression/index.html",
+  "assignments/a2-transforms-camera/index.html"
+];
 
 // https://vite.dev/config/
 export default defineConfig({
   root: "src",
+  publicDir: "../public",
+  plugins: [],
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
+      // "@" here refers to the root folder
+      // "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@": path.resolve(import.meta.dirname, './src'),
+    }
   },
   build: {
     outDir: "../dist",
     emptyOutDir: true,
+    // minify: 'esbuild',
+    sourcemap: true,
     rollupOptions: {
       input: Object.fromEntries(
         pages.map((page) => [
@@ -30,6 +41,6 @@ export default defineConfig({
           fileURLToPath(new URL(`./src/${page}`, import.meta.url)),
         ]),
       ),
-    },
-  },
+    }
+  }
 });
