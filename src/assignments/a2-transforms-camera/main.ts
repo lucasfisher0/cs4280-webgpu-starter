@@ -2,6 +2,7 @@
 import {createShaderModule} from "@/lib/webgpu/shaders";
 import shaderCode from "./shaders.wgsl?raw";
 import {configureContext} from "@/lib/webgpu/context";
+import GUI from "lil-gui";
 
 
 async function main() {
@@ -89,3 +90,20 @@ async function main() {
 }
 
 main();
+
+const gui = new GUI();
+const params = {
+  options: 10,
+  boolean: true,
+  string: 'lil-gui',
+  number: 0,
+  color: '#aa00ff',
+  function() { console.log( 'hi' ) }
+};
+
+gui.add( params, 'options', { Small: 1, Medium: 10, Large: 100 } );
+gui.add( params, 'boolean' );
+gui.add( params, 'string' );
+gui.add( params, 'number' );
+gui.addColor( params, 'color' );
+gui.add( params, 'function' ).name( 'Custom Name' );
