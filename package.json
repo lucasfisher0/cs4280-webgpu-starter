@@ -20,10 +20,13 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.4",
     "@types/node": "^22.20.3",
-    "@webgpu/types": "^0.1.72",
+    "@types/web": "^0.0.356",
     "jsdom": "^30.0.1",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": true
   }
 }

@@ -1,4 +1,3 @@
-/// <reference types="vite/client" />
 
 /* This file can be used for auto-completion and typing of custom
     environment variables, provided they start with VITE_

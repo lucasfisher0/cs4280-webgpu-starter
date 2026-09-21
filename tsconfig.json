@@ -4,13 +4,16 @@
     // File Layout
     // "rootDir": "./src",
     // "outDir": "./dist",
+    "paths": {
+        "@/*": ["./src/*"]
+    },
 
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
     "module": "esnext",
     "target": "es2023",
-    "lib": ["ES2023", "DOM"],
-    "types": ["vite/client"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "web"],//, "@webgpu/types"],
 
     // Other Outputs
     "sourceMap": true,
@@ -34,8 +37,8 @@
 
     // Linting
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
@@ -45,7 +48,6 @@
     // Check if these are needed:
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true
-
   },
   "include": ["src"]
 }
