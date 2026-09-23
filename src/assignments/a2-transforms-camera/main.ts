@@ -5,7 +5,21 @@ import {configureContext} from "@/lib/webgpu/context";
 import GUI from "lil-gui";
 
 
-async function main() {
+const gui = new GUI();
+const params = {
+  scale: 1.0,
+  speed: 1.0,
+};
+
+gui.add( params, 'options', { Small: 1, Medium: 10, Large: 100 } );
+gui.add( params, 'boolean' );
+gui.add( params, 'string' );
+gui.add( params, 'cameraDistance', 2, 12, 0.1);
+gui.addColor( params, 'color' );
+gui.add( params, 'function' ).name( 'Run Function' );
+
+
+async function InitWebGPU() {
   const adapter: GPUAdapter | null = await navigator.gpu.requestAdapter();
   if (!adapter) {
     return;
@@ -33,7 +47,7 @@ async function main() {
 
   const pipeline = device.createRenderPipeline({
     label: "the-pipeline",
-    "layout": "auto",
+    layout: "auto",
     vertex: {
       module: shaderModule,
       entryPoint: "vertexMain",
@@ -62,48 +76,20 @@ async function main() {
   const passEncoder = commandEncoder.beginRenderPass({
     label: "render-encoder",
     colorAttachments: [{
-      view: context.getCurrentTexture(),
-      clearValue: {r: 0.0, g: 0.0, b: 0.0, a: 1.0},
+      view: context.getCurrentTexture().createView(),
+      clearValue: {r: 0.05, g: 0.05, b: 0.05, a: 1.0},
       loadOp: "clear",
       storeOp: "store"
     }]
   });
+
+  //passEncoder.setBindGroup()
   passEncoder.setPipeline(pipeline);
   passEncoder.setVertexBuffer(0, vertexBuffer);
   passEncoder.draw(3);
   passEncoder.end();
 
-  /*
-  clearValue?: GPUColor
-  depthSlice?: GPUIntegerCoordinate
-  loadOp: GPULoadOp
-  resolveTarget?: GPUTexture | GPUTextureView
-  storeOp: GPUStoreOp
-  view: GPUTexture | GPUTextureView
-}
-*/
-
-
-  if (!commandEncoder || !pipeline)
-    return;
-
+  device.queue.submit([commandEncoder.finish()]);
 }
 
-main();
-
-const gui = new GUI();
-const params = {
-  options: 10,
-  boolean: true,
-  string: 'lil-gui',
-  number: 0,
-  color: '#aa00ff',
-  function() { console.log( 'hi' ) }
-};
-
-gui.add( params, 'options', { Small: 1, Medium: 10, Large: 100 } );
-gui.add( params, 'boolean' );
-gui.add( params, 'string' );
-gui.add( params, 'number' );
-gui.addColor( params, 'color' );
-gui.add( params, 'function' ).name( 'Custom Name' );
+InitWebGPU();

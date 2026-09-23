@@ -14,7 +14,9 @@ import path from 'path';
 const pages = [
   "index.html",
   "assignments/a1-image-compression/index.html",
-  "assignments/a2-transforms-camera/index.html"
+  "assignments/a2-transforms-camera/index.html",
+  "activities/sample-triangle/index.html",
+  "activities/sierpinski-gasket/index.html",
 ];
 
 // https://vite.dev/config/
