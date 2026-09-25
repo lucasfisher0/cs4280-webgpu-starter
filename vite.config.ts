@@ -25,6 +25,7 @@ export default defineConfig({
   publicDir: "../public",
   plugins: [],
   resolve: {
+    tsconfigPaths: true,
     alias: {
       // "@" here refers to the root folder
       // "@": fileURLToPath(new URL("./src", import.meta.url)),

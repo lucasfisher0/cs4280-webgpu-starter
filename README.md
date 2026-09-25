@@ -44,7 +44,7 @@ examples directly.
 | `npm run lint` | Check formatting/lint rules with Biome. |
 | `npm run lint:fix` | Same, applying safe fixes. |
 | `npm run ci` | `lint` + `test` + `build`, what CI runs. |
-
+<!-- `$env:DEBUG="vite:resolve"; npm run dev` -->
 ## Project structure
 
 ```
