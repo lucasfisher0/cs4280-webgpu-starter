@@ -1,16 +1,47 @@
 import shaderCode from "./shaders.wgsl?raw";
-//import type {GPUBufferUsage, GPUShaderStage} from '@webgpu/types';
+import GUI from "lil-gui";
 
-const scaleSlider = document.getElementById("scaleSlider") as HTMLInputElement;
-const speedSlider = document.getElementById("speedSlider") as HTMLInputElement;
+type Point = [x: number, y: number];
 
-let currTime: number | null = null;
-function getDeltaTime(): number {
-  const oldTime = currTime;
-  currTime = performance.now();
-  return !oldTime ? 0.0 : (currTime - oldTime) * 0.001;
+const gui = new GUI({ container: document.getElementById( "controlContainer" )! });
+const params = {
+  count: 1000,
+  color: '#fd0303',
+  bgColor: '#131313'
+};
+
+const INITIAL_TRIANGLE: Point[] = [
+  [-1, 1],
+  [0, 1],
+  [1, 1]
+];
+let VERTEX_DATA: Float32Array | null = null;
+let vertexBuffer: GPUBuffer | null = null;
+
+gui.add( params, "count", 100, 10000, 100).onChange( async (n: number)=>{
+  if (vertexBuffer != null)
+    (vertexBuffer as GPUBuffer).destroy();
+
+  const points: number[] = [...sierpinksi(n)].flat(2);
+  VERTEX_DATA = new Float32Array(points);
+});
+
+function sierpinksi(n: number, triangle: Point[] = INITIAL_TRIANGLE): Point[] {
+  const points: Point[] = [];
+
+  let position: Point = [0, 0];
+  for (let i = 0; i < n; i++) {
+    const c = Math.floor(Math.random() * 3);
+    position[0] = (position[0] + triangle[c]![0])/2;
+    position[1] = (position[1] + triangle[c]![1])/2;
+    points.push(position);
+  }
+
+  return points;
 }
+
 async function initWebGPU() {
+//#region Initialization
   if (!navigator.gpu) {
     console.log("WebGPU is not supported.");
     return;
@@ -33,22 +64,9 @@ async function initWebGPU() {
 
   context.configure({
     device, format, alphaMode: "opaque"
-  })
+  });
 
-  const VERTEX_DATA = new Float32Array([
-    // x, y, r, g, b
-    0.0, 0.5, 1.0, 0.2, 0.2,
-    -0.5, -0.5, 0.2, 1.0, 0.2,
-    0.5, -0.5, 0.2, 0.2, 1.0,
-  ])
-
-  const vertexBuffer = device.createBuffer({
-    label: "triangle-vertices",
-    size: VERTEX_DATA.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-  })
-
-  device.queue.writeBuffer(vertexBuffer, 0, VERTEX_DATA)
+//#endregion
 
   const UNIFORM_SIZE: number = 4 * 4;
   let uniformBuffer: GPUBuffer = device.createBuffer({
@@ -79,18 +97,15 @@ async function initWebGPU() {
 
   const pipeline = device.createRenderPipeline({
     label: "the-pipeline",
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [bindGroupLayout]
-    }),
+    layout: "auto",
     vertex: {
       module: shaderModule,
       entryPoint: 'vertexMain',
       buffers: [
         {
-          arrayStride: 5 * 4,
+          arrayStride: 2 * 4,
           attributes: [
             { shaderLocation: 0, offset: 0, format: 'float32x2' },
-            { shaderLocation: 1, offset: 2 * 4, format: 'float32x2' },
           ]
         }
       ]
@@ -100,21 +115,24 @@ async function initWebGPU() {
       entryPoint: "fragmentMain",
       targets: [{ format: format }]
     },
-    primitive: { topology: 'triangle-list' }
+    primitive: { topology: 'point-list' }
   })
 
-  let angle: number = 0.0;
   function renderFrame() {
-    const deltaTime = getDeltaTime();
-    const scale = scaleSlider.valueAsNumber;
-    const speed = speedSlider.valueAsNumber;
-    angle += speed * deltaTime;
+    if (VERTEX_DATA == null) {
+      const points: number[] = [...sierpinksi(params.count)].flat();
+      VERTEX_DATA = new Float32Array(points);
+    }
 
-    const c = Math.cos(angle) * scale;
-    const s = Math.sin(angle) * scale;
-    const uniformData = new Float32Array([c, s, -s, c]);
+    if (vertexBuffer == null) {
+      vertexBuffer = device.createBuffer({
+        label: "triangle-vertices",
+        size: VERTEX_DATA.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+      });
+    }
+    device.queue.writeBuffer(vertexBuffer, 0, VERTEX_DATA);
 
-    device.queue.writeBuffer(uniformBuffer, 0, uniformData);
     const commandEncoder = device.createCommandEncoder({
       label: 'frame-encoder',
     })
@@ -128,11 +146,11 @@ async function initWebGPU() {
       }]
     })
 
-    passEncoder.setPipeline(pipeline)
-    passEncoder.setVertexBuffer(0, vertexBuffer)
+    passEncoder.setPipeline(pipeline);
+    passEncoder.setVertexBuffer(0, vertexBuffer);
     passEncoder.setBindGroup(0, bindGroup);
-    passEncoder.draw(3)
-    passEncoder.end()
+    passEncoder.draw(VERTEX_DATA.length / 2);
+    passEncoder.end();
 
     device.queue.submit([commandEncoder.finish()])
     requestAnimationFrame(renderFrame);
