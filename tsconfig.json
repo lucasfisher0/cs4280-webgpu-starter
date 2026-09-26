@@ -27,14 +27,15 @@
 
     // Bundler Mode
     "moduleResolution": "bundler",
-    // "allowImportingTsExtensions": true,
+    "allowImportingTsExtensions": false,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
-    // "noEmit": true,
+    "noEmit": false,
 
     // JavaScript Support
     "allowJs": true,
     "checkJs": false,
+    "esModuleInterop": true,
 
     // Linting
     "strict": true,

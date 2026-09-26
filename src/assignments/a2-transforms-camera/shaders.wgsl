@@ -1,7 +1,8 @@
-// Hello Triangle — the minimal WebGPU vertex/fragment pair.
-//
-// Vertex buffer layout (see hello-triangle.js): interleaved [x, y, r, g, b]
-// per vertex, positions already in clip space (both axes in [-1, 1]).
+struct Uniforms {
+    MVP: mat4x4<f32>
+};
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
@@ -9,13 +10,11 @@ struct VertexOutput {
 };
 
 @vertex
-fn vertexMain(
-  @location(0) position: vec2<f32>,
-  @location(1) color: vec3<f32>,
-) -> VertexOutput {
+fn vertexMain(@location(0) position: vec2<f32>, @location(1) normal: vec3<f32>) -> VertexOutput {
   var out: VertexOutput;
-  out.position = vec4<f32>(position, 0.0, 1.0);
-  out.color = color;
+  let newPosition = uniforms.MVP * vec4<f32>(position, 0.0, 1.0);
+  out.position = vec4f(newPosition.xy / (1.0 + newPosition.z), newPosition.zw);
+  out.color = normal;
   return out;
 }
 

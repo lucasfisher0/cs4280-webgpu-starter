@@ -3,7 +3,9 @@
  * function below throws until you implement it. All matrices are
  * column-major `Float32Array(16)` (see `mat4.js`).
  */
-import {multiply} from "@/lib/math/mat4.js";
+import * as Mat4 from "@/lib/math/mat4.js";
+import * as Vec3 from "@/lib/math/vec3.js";
+import * as Vec4 from "@/lib/math/vec4.js";
 
 export function translate(_tx, _ty, _tz) {
   return new Float32Array([
@@ -23,18 +25,15 @@ export function scale(_sx, _sy, _sz) {
   ]);
 }
 
-
 export function shear(_xy, _xz, _yx, _yz, _zx, _zy) {
   // shear takes all 6 off-diagonal coefficients (xy, xz, yx, yz, zx, zy); each displaces
   // one axis by a multiple of another (e.g. xy shifts X by xy * y).
   // Leave the rest at 0 for a single-axis shear.
-
-  throw new Error("shear: not implemented");
   return new Float32Array([
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 1,
+    1,    _xy,  _xz,  0,
+    _yx,  1,    _yz,  0,
+    _zx,  _zy,  1,    0,
+    0,    0,    0,    1,
   ]);
 }
 
@@ -76,8 +75,22 @@ export function rotateZ(_radians) {
 
 /** A view matrix placing the camera at `eye`, looking toward `target`. */
 export function lookAt(_eye, _target, _up) {
-  // T(c)R
-  throw new Error("lookAt: not implemented");
+  // Construct Camera Basis
+  const f = Vec3.normalize(_target - _eye);
+  const r = Vec3.normalize(Vec3.cross(f, _up));
+  const u = Vec3.cross(r, f);
+
+  let view = new Float32Array(16);
+  view.set(f, 0);
+  view.set(r, 4);
+  view.set(u, 8);
+
+  return new Float32Array([
+    r[0],    r[1],  r[1], -Vec3.dot(r, _eye),
+    u[0],    u[1],  u[1], -Vec3.dot(u, _eye),
+    -f[0],  -f[1], -f[1],  Vec3.dot(f, _eye),
+    0,       0,     0,     1,
+  ]);
 }
 
 /**
@@ -85,16 +98,28 @@ export function lookAt(_eye, _target, _up) {
  * depth range (unlike OpenGL's `[-1, 1]`).
  */
 export function perspective(_fovYRadians, _aspect, _near, _far) {
-  throw new Error("perspective: not implemented");
+  const s = 1/(Math.tan(_fovYRadians/2));
+  return new Float32Array([
+    s/_aspect,    0,      0,                   0,
+    0,            s,      0,                   0,
+    0,            0,      _far/(_near-_far),   (-2*_far*_near)/(_near-_far),
+    0,            0,      -1,                   0,
+  ]);
 }
 
 // Intrinsic Z-Y-X Euler angles (yaw * pitch * roll) — a common convention
 // and a direct source of gimbal lock when pitch approaches +/-90 degrees.
 export function fromEulerZYX(_yaw, _pitch, _roll) {
-  return multiply(rotateZ(_yaw), multiply(rotateY(_pitch), rotateX(_roll)));
+  //return Mat4.multiply(rotateZ(_yaw), Mat4.multiply(rotateY(_pitch), rotateX(_roll)));
+  return Mat4.multiply(rotateZ(_yaw), Mat4.multiply(rotateY(_pitch), rotateX(_roll)));
 }
 
 /** An orthographic projection matrix, same `z` in `[0, 1]` convention as `perspective`. */
 export function ortho(_left, _right, _bottom, _top, _near, _far) {
-  throw new Error("ortho: not implemented");
+  return new Float32Array([
+    2/(_right-1), 0,      0,                -(_right+1)/(_right-1),
+    0,            1,      2/(_top-_bottom), -(_top+_bottom)/(_top-_bottom),
+    0,            0,      2/(_near-_far),    _near/(_near-_far),
+    0,            0,      0,                 1,
+  ]);
 }
