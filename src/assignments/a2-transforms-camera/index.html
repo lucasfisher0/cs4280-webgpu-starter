@@ -3,22 +3,128 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23020617'/%3E%3Cpolygon points='16,7 26,25 6,25' fill='%2338bdf8'/%3E%3C/svg%3E"/>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css"/>     <!-- ROOT STYLESHEET -->
   <link rel="stylesheet" href="./style.css"/>    <!-- LOCAL STYLESHEET -->
   <title>Assignment 2 — Transforms &amp; Camera · CS 4280</title>
 </head>
 
 <body>
+<script>
+  function toggleVisibility(id) {
+    const elem = document.getElementById(id);
+    if (elem)
+      elem.toggleAttribute("collapsed");
+  }
+</script>
 <div class="page">
   <a class="back-link" href="/">← Back to course home</a>
   <h1>Assignment 2 — Transforms &amp; Camera</h1>
-  <p class="summary">
-    Wire up your own WebGPU pipeline: a cube driven by a model/view/projection matrix built
-    from <code>lib/math/transforms.js</code>, with an orbit camera controlled by dragging the
-    canvas. See the assignment handout for the full spec.
-  </p>
+  <h3>Post-Submission Questions</h3>
+
+  <button type="button" onclick="toggleVisibility('question1')">
+    <b>1. Verify a rotation matrix by hand &#8693;</b>
+  </button>
+
+  <div class="collapsible" collapsed id="question1">
+    </br>rotateY implementation:
+    <pre><code>
+  export function rotateY(_radians) {
+      const c = Math.cos(_radians);
+      const s = Math.sin(_radians);
+
+      return new Float32Array([
+          c, 0, -s, 0,
+          0, 1,  0, 0,
+          s, 0,  c, 0,
+          0, 0,  0, 1,
+      ]);
+  }
+    </code></pre>
+    <p>
+      Rotating by Y is similar to rotating an object on the floor. If I used a triangle aligned with the X axis, by
+      rotating
+      it 90° on the Y-axis, the same face should align with the Z-axis.<br/><br/>
+
+      Starting with triangle: [0 0 0], [1 0 0], [0 0 0.5], and rotating by 90°:<br/>
+      cos(90°) = 0; sin(90°) = 1;<br/><br/>
+
+      The transformation matrix is therefore:<br/>
+      | 0, 0, -1, 0 |<br/>
+      | 0, 1, &nbsp;0, 0 |<br/>
+      | 1, 0, &nbsp;0, 0 |<br/>
+      | 0, 0, &nbsp;0, 1 |<br/><br/>
+
+      Below is the calculation for the points, showing that the two sides have been rotated 90° and matches the expected
+      result.
+      The arrow on the triangle shows the long edge, not the winding. <br/><br/>
+
+      <img src="/asn2_q1.jpg" alt="Matrix rotation, hand-written" style="max-width: 70%; height: auto;"/>
+    </p>
+  </div>
+
+  <button type="button" onclick="toggleVisibility('question2')">
+    <b>2. Composition order &#8693;</b>
+  </button>
+  <div class="collapsible" collapsed id="question2">
+    <p>
+      To better answer this question, I've implemented full transform controls for the cube, along with an additional
+      control to change the order in which the shear is applied.
+      By default, the shear is applied as a modifier to the final model because other the shear would alter the model
+      itself. Applying the shear after the model transform
+      uses the model's local axes. Shearing first, then transforming, would mean the model is sheared along the world
+      axes before applying modifiers to its own axes. <br/><br/>
+    </p>
+
+    <div style="display: flex;">
+      <img src="/trs-shear.jpg" alt="TRS-Shear" style="max-width: 50%; height: auto;"/>
+      <img src="/shear-trs.jpg" alt="Shear-TRS" style="max-width: 50%; height: auto;"/>
+    </div>
+    <p>
+      Above is a simple example of a model with uneven scale and a shear in one direction. The first image is the
+      default behavior, transform then shear. You can see that sides are mostly vertical-- the shear is minor. <br/><br/>
+      The second image applies shearing before the scaling. Because the scaling happens afterward, the scaling applies
+      to the distortion caused by the shear and exaggerates it.
+    </p>
+  </div>
+
+  <button type="button" onclick="toggleVisibility('question3')">
+    <b>3. Debug a real bug &#8693;</b>
+  </button>
+  <div class="collapsible" collapsed id="question3">
+    <p>
+      Once the canvas was correctly drawn to, the faces of the cube would disappear at certain angles, there was no depth sorting, and the faces didn't appear to line edge-to-edge.<br/><br/>
+
+      I checked the model transforms, validated that the reduce behavior inside mat4.multiplyAll worked as I thought it did.<br/>
+      I rechecked the cube model, the windings to ensure this was not a culling issue, and that all vertices were requested to be drawn.<br/>
+      I went over the vertices, the pipeline, and the shader.<br/>
+      Every single transform; the model, the view, and the projection, was double-checked for where the error could lie.<br/>
+      I did a <i>lot</i> of Googling. I got desperate and uploaded my files to DeepSeek to help me find errors, all to no avail.<br/>
+      Despite having implemented almost all the functions earlier, it would still not show correctly.<br/>
+      I spent 5 hours trying to find the issue-- double-checking the coordinate system, that the camera axes were correct.<br/>
+      I did not have time to implement the axes, the orbit camera, lint the code, or even fix the problem itself.<br/><br/>
+
+      I finally found the solution after checking literally everything in this project multiple times, going over both the lecture slides and my notes, when I went over the given examples again.<br/>
+      It's now 5:08AM, and I'm still writing this. I've been sitting here for 12 hours.<br/><br/>
+
+      WGSL uses column-vectors.
+    </p>
+  </div>
+
+  <button type="button" onclick="toggleVisibility('question4')">
+    <b>4. Pitch clamp &#8693;</b>
+  </button>
+  <div class="collapsible" collapsed id="question4">
+    <p>
+      When reaching an absolute pitch of +/-90°, both the X and Z axes appear to invert. To investigate why this happens, let's take a look at the <code>lookAt</code> function.<br/>
+      The first step involves creating a camera basis, where the right vector is determined using the cross product of forward and the up direction.<br/>
+      If we are at a 90° angle, the forward direction will always be the same or opposite direction of the up direction.<br/><br/>
+
+      Either case results in a cross product of 0, and by thinking of the cross product as an area, the area between any vectors on the same axis is always zero.<br/>
+      This camera behavior is similar to Gimbal locking caused by Euler angles and can be easily resolved by using quaternions.<br/>
+    </p>
+  </div>
+
   <div class="layout">
     <div class="canvas-frame drag-surface" id="canvasFrame">
       <canvas id="canvas"></canvas>

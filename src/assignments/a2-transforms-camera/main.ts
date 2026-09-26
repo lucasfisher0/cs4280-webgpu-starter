@@ -4,27 +4,96 @@ import shaderCode from "./shaders.wgsl?raw";
 import {CUBE_VERTICES, AXIS_VERTICES} from "./cube";
 import {Camera} from "./camera";
 import {configureContext} from "@/lib/webgpu/context";
-import GUI from "lil-gui";
+import GUI, {Controller} from "lil-gui";
 import {Entity} from "@/assignments/a2-transforms-camera/entity";
-import {identity, invert, multiply, multiplyAll} from "@/lib/math/mat4";
-import {lookAt, ortho, perspective, scale as matrixScale, shear} from "@/lib/math/transforms";
+import {identity as matrixIdentity, multiply, multiplyAll, transpose} from "@/lib/math/mat4";
+import {
+  fromEulerZYX,
+  ortho,
+  perspective,
+  scale as matrixScale,
+  shear,
+  translate as matrixTranslate
+} from "@/lib/math/transforms";
+
+function deg2rad(deg: number) {
+  return deg * Math.PI / 180;
+}
 
 //#region GUI
 const gui = new GUI( { container: document.getElementById( 'controlBox' )! } );
 const params = {
   cameraDistance: 5,
   cameraSpin: true,
-  scale: 1.0,
-  shearX: 0,
-  shearY: 0,
-  shearZ: 0
+  translate: {x: 0, y: 0, z: 0},
+  rotate: {x: 0, y: 0, z: 0},
+  scale: {x: 1, y: 1, z: 1},
+  universalScale: 1,
+  shear: {x: 0, y: 0, z: 0},
+  order: "TRS-Shear",
 };
-gui.add(params, 'cameraDistance', 2, 12, 0.1);
-gui.add(params, 'scale', 0.3, 2, 0.05);
-gui.add(params, 'shearX', -1, 1, 0.05);
-gui.add(params, 'shearY', -1, 1, 0.05);
-gui.add(params, 'shearZ', -1, 1, 0.05);
-gui.add(params, 'cameraSpin');
+
+const folderCamera = gui.addFolder("Camera");
+const distanceControl = folderCamera.add(params, "cameraDistance", 2, 12, 0.1).name("Distance");
+folderCamera.add(params, "cameraSpin").name("Spin");
+
+const folderTransform = gui.addFolder( "Translate" );
+for (const key in params.translate) {
+  const elem = folderTransform.add(params.translate, key as keyof typeof params.translate, -1, 1)
+    .name(key.toUpperCase())
+    .domElement!.parentElement!;
+
+  elem.classList.add("inline-gui-property");
+  elem.style = "width: 33.33%;";
+}
+
+const folderRotate = gui.addFolder( "Rotate (°)" );
+for (const key in params.rotate) {
+  const elem = folderRotate.add(params.rotate, key as keyof typeof params.rotate, -180, 180)
+    .name(key.toUpperCase())
+    .domElement!.parentElement!;
+
+  elem.classList.add("inline-gui-property");
+  elem.style = "width: 33.33%;";
+}
+
+const folderScale = gui.addFolder( "Scale" );
+let scaleControls: Controller[] = [];
+scaleControls.push(folderScale.add(params.scale, "x", 0.3, 2, 0.05))
+scaleControls.push(folderScale.add(params.scale, "z", 0.3, 2, 0.05));
+scaleControls.push(folderScale.add(params.scale, "y", 0.3, 2, 0.05));
+scaleControls.push(folderScale.add(params, "universalScale", 0.3, 2, 0.05)
+  .name("Universal")
+  .onChange(() => {
+    params.scale.x = params.universalScale;
+    params.scale.y = params.universalScale;
+    params.scale.z = params.universalScale;
+    scaleControls.forEach((control: Controller) => {
+      control.updateDisplay();
+    })}));
+
+/*
+for (const key in params.scale) {
+  const elem = folderScale.add(params.scale, key as keyof typeof params.scale, 0.3, 2, 0.05)
+    .name(key.toUpperCase())
+    .domElement!.parentElement!;
+
+  elem.classList.add("inline-gui-property");
+  elem.style = "width: 33.33%;";
+}
+ */
+
+const folderShear = gui.addFolder( "Shear" );
+for (const key in params.shear) {
+  const elem = folderShear.add(params.shear, key as keyof typeof params.shear, -1, 1, 0.05)
+    .name(key.toUpperCase())
+    .domElement!.parentElement!;
+
+  elem.classList.add("inline-gui-property");
+  elem.style = "width: 33.33%;";
+}
+
+gui.add(params, 'order', ["TRS-Shear", "Shear-TRS"])
 //#endregion
 
 //#region Delta Time
@@ -50,7 +119,10 @@ async function InitWebGPU() {
   if (!adapter) {
     return;
   }
-  const canvas = document.getElementById("canvas")! as HTMLCanvasElement;//new HTMLCanvasElement();
+  const canvas = document.getElementById("canvas")! as HTMLCanvasElement;
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+
   const device: GPUDevice = await adapter.requestDevice();
   const format = navigator.gpu.getPreferredCanvasFormat();
   const context = configureContext(canvas, device, format);
@@ -67,6 +139,10 @@ async function InitWebGPU() {
   canvas.addEventListener("pointerup", () => { dragging = false; pointer_last = null; });
   canvas.addEventListener("pointercancel", () => { dragging = false; pointer_last = null; });
 
+  canvas.addEventListener("wheel", (e: WheelEvent) => {
+    params.cameraDistance = Math.max(Math.min(params.cameraDistance + e.deltaY*0.005, 12), 2);
+    distanceControl.updateDisplay();
+  });
 
 //#region Uniform
   const UNIFORM_SIZE: number = 16 * 4; // one mat4x4<f32>: mvp
@@ -113,7 +189,7 @@ async function InitWebGPU() {
 
   device.pushErrorScope('validation');
   const pipeline = device.createRenderPipeline({
-    label: "the-pipeline",
+    label: "cube-pipeline",
     layout: device.createPipelineLayout({
       bindGroupLayouts: [bindGroupLayout]
     }),
@@ -138,7 +214,6 @@ async function InitWebGPU() {
     primitive: {
       topology: "triangle-list",
       cullMode: "back",
-      frontFace: "cw"
     },
     depthStencil: {
       depthWriteEnabled: true,
@@ -146,13 +221,55 @@ async function InitWebGPU() {
       format: 'depth24plus'
     }
   });
-  device.popErrorScope().then(e => e && console.error('pipeline error:', e.message));
+  device.popErrorScope().then(e => e && console.error('cube pipeline error:', e.message));
 //#endregion
 
-  let depthTexture: GPUTexture | null = null;
+  const axisBuffer = device.createBuffer({
+    label: "axis-vertices",
+    size: AXIS_VERTICES.byteLength,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  })
+  device.queue.writeBuffer(axisBuffer, 0, AXIS_VERTICES);
+
+  const axisPipeline = device.createRenderPipeline({
+    label: "axis-pipeline",
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [bindGroupLayout]
+    }),
+    vertex: {
+      module: shaderModule,
+      entryPoint: "vertexAxis",
+      buffers: [
+        {
+          arrayStride: 6 * 4, // Float32 per vertex * bytes per float32
+          attributes: [
+            {shaderLocation: 0, offset: 0, format: "float32x3"},
+            {shaderLocation: 1, offset: 3 * 4, format: "float32x3"}
+          ]
+        }
+      ]
+    },
+    fragment: {
+      module: shaderModule,
+      entryPoint: "fragmentMain",
+      targets: [{format: format}]
+    },
+    primitive: {
+      topology: "line-list"
+    },
+    depthStencil: {
+      depthWriteEnabled: true,
+      depthCompare: 'less',
+      format: 'depth24plus'
+    }
+  });
+  device.popErrorScope().then(e => e && console.error('axis pipeline error:', e.message));
+
+
 
 
 //#region Frame
+  let depthTexture: GPUTexture | null = null;
   function renderFrame() {
     const deltaTime = getDeltaTime();
     camera.tetherDistance = params.cameraDistance;
@@ -172,9 +289,13 @@ async function InitWebGPU() {
     camera.tick(deltaTime);
 
     // Model
-    cube.scale = matrixScale(params.scale, params.scale, params.scale);
-    let modelMatrix = cube.getTransformMatrix();
-    modelMatrix = multiply(modelMatrix, shear(params.shearX, 0, params.shearY, 0, params.shearZ, 0));
+    cube.translation = matrixTranslate(params.translate.x, params.translate.y, params.translate.z);
+    cube.rotation = fromEulerZYX(deg2rad(params.rotate.z), deg2rad(params.rotate.y), deg2rad(params.rotate.x));
+    cube.scale = matrixScale(params.scale.x, params.scale.y, params.scale.z);
+
+    const modelMatrix = params.order == "TRS-Shear" ?
+      multiply(cube.getTransformMatrix(), shear(params.shear.x, 0, params.shear.y, 0, params.shear.z, 0)) :
+      multiply(shear(params.shear.x, 0, params.shear.y, 0, params.shear.z, 0), cube.getTransformMatrix());
 
     // Projection
     const a = canvas.clientWidth/canvas.clientHeight;
@@ -213,15 +334,18 @@ async function InitWebGPU() {
       }
     })
 
+    device.queue.writeBuffer(uniformBuffer, 0, transpose(mvp));
     passEncoder.setPipeline(pipeline);
     passEncoder.setVertexBuffer(0, vertexBuffer);
-    device.queue.writeBuffer(uniformBuffer, 0, mvp);
     passEncoder.setBindGroup(0, bindGroup);
     passEncoder.draw(36); // 6 faces x 2 triangles x 3 vertices
 
-    // TODO GIZMO PASS
-    passEncoder.end();
+    passEncoder.setPipeline(axisPipeline);
+    passEncoder.setVertexBuffer(0, axisBuffer);
+    passEncoder.setBindGroup(0, bindGroup);
+    passEncoder.draw(6);
 
+    passEncoder.end();
     device.pushErrorScope('validation');
     device.queue.submit([commandEncoder.finish()])
     device.popErrorScope().then(e => e && console.error('error:', e.message));

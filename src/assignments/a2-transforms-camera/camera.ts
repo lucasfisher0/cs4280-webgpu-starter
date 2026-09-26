@@ -1,6 +1,4 @@
-import {lookAt, translate} from "@/lib/math/transforms.js";
-import {identity, multiply} from "@/lib/math/mat4.js";
-import {fromEulerZYX} from "@/lib/math/transforms.js";
+import { lookAt } from "@/lib/math/transforms.js";
 
 /**
  * Custom camera class to encapsulate all behavior, such as positioning and controls.

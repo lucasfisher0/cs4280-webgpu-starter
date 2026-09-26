@@ -21,3 +21,11 @@ fn vertexMain(@location(0) position: vec3<f32>, @location(1) normal: vec3<f32>) 
 fn fragmentMain(in: VertexOutput) -> @location(0) vec4<f32> {
   return vec4<f32>(in.color, 1.0);
 }
+
+@vertex
+fn vertexAxis(@location(0) position: vec3<f32>, @location(1) color: vec3<f32>) -> VertexOutput {
+  var out: VertexOutput;
+  out.position = uniforms.MVP * vec4<f32>(position, 1.0);
+  out.color = color;
+  return out;
+}

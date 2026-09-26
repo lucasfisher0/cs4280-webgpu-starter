@@ -29,8 +29,5 @@
   },
   "allowScripts": {
     "fsevents@2.3.3": true
-  },
-  "dependencies": {
-    "wgpu-matrix": "^3.4.2"
   }
 }

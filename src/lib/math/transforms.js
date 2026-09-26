@@ -5,7 +5,6 @@
  */
 import * as Mat4 from "@/lib/math/mat4.js";
 import * as Vec3 from "@/lib/math/vec3.js";
-import * as Vec4 from "@/lib/math/vec4.js";
 
 export function translate(_tx, _ty, _tz) {
   return new Float32Array([
@@ -42,10 +41,10 @@ export function rotateX(_radians) {
   const s = Math.sin(_radians);
 
   return new Float32Array([
-    1, 0,  0, 0,
-    0, c, -s, 0,
-    0, s,  c, 0,
-    0, 0,  0, 1,
+    1,  0, 0, 0,
+    0,  c, s, 0,
+    0, -s, c, 0,
+    0,  0, 0, 1,
   ]);
 }
 
@@ -54,10 +53,10 @@ export function rotateY(_radians) {
   const s = Math.sin(_radians);
 
   return new Float32Array([
-     c, 0, s, 0,
-     0, 1, 0, 0,
-    -s, 0, c, 0,
-     0, 0, 0, 1,
+    c, 0, -s, 0,
+    0, 1,  0, 0,
+    s, 0,  c, 0,
+    0, 0,  0, 1,
   ]);
 }
 
@@ -66,10 +65,10 @@ export function rotateZ(_radians) {
   const s = Math.sin(_radians);
 
   return new Float32Array([
-    c, -s, 0, 0,
-    s,  c, 0, 0,
-    0,  0, 1, 0,
-    0,  0, 0, 1,
+     c, s, 0, 0,
+    -s, c, 0, 0,
+     0, 0, 1, 0,
+     0, 0, 0, 1,
   ]);
 }
 
@@ -78,7 +77,7 @@ export function lookAt(_eye, _target, _up) {
   // Construct Camera Basis
   const f = Vec3.normalize(Vec3.sub(_target, _eye));
   const r = Vec3.normalize(Vec3.cross(f, _up));
-  const u = Vec3.cross(r, f);
+  const u = Vec3.normalize(Vec3.cross(r, f));
 
   return new Float32Array([
      r[0],   r[1],  r[2], -Vec3.dot(r, _eye),
@@ -97,8 +96,8 @@ export function perspective(_fovYRadians, _aspect, _near, _far) {
   return new Float32Array([
     s/_aspect,    0,      0,                   0,
     0,            s,      0,                   0,
-    0,            0,      _far/(_near-_far),   (_far*_near)/(_near-_far),
-    0,            0,      -1,                  0,
+    0,            0,      _far/(_near-_far),   -1,
+    0,            0,      (_far*_near)/(_near-_far),                  0,
   ]);
 }
 
@@ -111,9 +110,9 @@ export function fromEulerZYX(_yaw, _pitch, _roll) {
 /** An orthographic projection matrix, same `z` in `[0, 1]` convention as `perspective`. */
 export function ortho(_left, _right, _bottom, _top, _near, _far) {
   return new Float32Array([
-    2/(_right-_left), 0,                     0,                 -(_right+_left)/(_right-_left),
-    0,                2/(_top-_bottom),      0,                 -(_top+_bottom)/(_top-_bottom),
-    0,                0,                     1/(_near-_far),    _near/(_near-_far),
-    0,                0,                     0,                 1,
+    2/(_right-_left), 0,                     0,                 0,
+    0,                2/(_top-_bottom),      0,                 0,
+    0,                0,                     1/(_near-_far),    0,
+    (_right+_left)/(_left-_right),                (_top+_bottom)/(_bottom-_top),                     _near/(_near-_far),                 1,
   ]);
 }
