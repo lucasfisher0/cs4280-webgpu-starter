@@ -7,16 +7,15 @@ import {identity as matrixIdentity, multiply, multiplyAll} from "@/lib/math/mat4
 export class Entity {
   translation: Float32Array;
   rotation: Float32Array;
-  scale: Float32Array = 1;
+  scale: Float32Array;
 
   constructor(translation?: Float32Array, rotation?: Float32Array, scale?: Float32Array) {
     this.translation = translation ?? matrixTranslate(0, 0, 0);
     this.rotation = rotation ?? matrixIdentity();
-    this.scale = scale ?? matrixScale(this.scale, this.scale, this.scale);
+    this.scale = scale ?? matrixScale(1, 1, 1);
   }
 
   getTransformMatrix(): Float32Array {
-    return matrixScale(this.scale, this.scale, this.scale);
     return multiplyAll([this.translation, this.rotation, this.scale]);
   }
 }

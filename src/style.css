@@ -117,3 +117,43 @@ canvas {
 .full-row {
   flex: 1 1 100%;
 }
+
+.collapsible {
+  height: auto;
+  overflow: hidden;
+  transition: height 0.3s ease-in-out;
+}
+
+.collapsible[collapsed] {
+  height: 0;
+}
+
+.break {
+  flex-basis: 100%;
+  height: 0;
+}
+
+/* ---- Lil' GUI overrides ---- */
+
+.lil-children .lil-controller {
+  display: inline-flex;
+  flex-wrap: wrap;
+  flex-direction: row !important; /* TODO: BETTER SPECIFICITY */
+}
+.lil-children .lil-controller .lil-widget {
+  display: inline-flex;
+  flex-direction: row !important; /* TODO: BETTER SPECIFICITY */
+}
+
+.lil-children.inline-gui-property {
+  display: inline-flex;
+  flex-direction: row;
+  border-left: none;
+  /*width: 33.33%;*/
+  padding-left: 5px;
+}
+
+.inline-gui-property .lil-controller > .lil-name {
+  width: 15px;
+  min-width: 15px;
+}
