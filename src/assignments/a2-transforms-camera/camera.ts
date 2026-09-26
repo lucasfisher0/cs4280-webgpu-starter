@@ -14,13 +14,17 @@ export class Camera {
   clipFar: number  = 100.0;
   verticalFov: number = 1.0472; // 60 deg, vertical FoV
 
+  /** Camera position derived from tether distance + yaw/pitch. */
   getPosition(): Float32Array {
-    // TODO: FIXME
-    return new Float32Array([3, 3, 3]);
+    const yaw = this.rotation[0];
+    const pitch = this.rotation[1];
+    const r = this.tetherDistance;
 
-    // This should return vec3 coordinates instead of a matrix
-    let position = translate(0, 0, -this.tetherDistance);
-    return multiply(position, fromEulerZYX(this.rotation[0], this.rotation[1], this.rotation[2]));
+    return new Float32Array([
+      r * Math.cos(pitch) * Math.sin(yaw),
+      r * Math.sin(pitch),
+      r * Math.cos(pitch) * Math.cos(yaw)
+    ]);
   }
 
   addRotation(yaw: number, pitch: number) {

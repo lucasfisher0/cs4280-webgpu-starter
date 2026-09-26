@@ -37,6 +37,8 @@ function getDeltaTime(): number {
 //#endregion
 
 const camera = new Camera();
+
+
 const cube = new Entity();
 
 async function InitWebGPU() {
@@ -50,6 +52,32 @@ async function InitWebGPU() {
   const format = navigator.gpu.getPreferredCanvasFormat();
   const context = configureContext(canvas, device, format);
 //#endregion
+
+  const cam_sens = 0.005;
+  let dragging = false;
+  let touch_x: number | null = null;
+  let touch_y: number | null = null;
+
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    dragging = true;
+    console.warn("drag")
+  }, {passive: false});
+  canvas.addEventListener("touchend", () => {
+    dragging = false;
+  });
+  canvas.addEventListener("touchcancel", () => {
+    dragging = false;
+  });
+
+  window.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    if (!dragging) return;
+
+    touch_x = e.touches[0].clientX;
+    touch_y = e.touches[0].clientY;
+  }, {passive: false});
+
 
 //#region Uniform
   const UNIFORM_SIZE: number = 16 * 4; // one mat4x4<f32>: mvp
@@ -130,11 +158,27 @@ async function InitWebGPU() {
 
   let depthTexture: GPUTexture | null = null;
 
+  let x_last: number | null = null;
+  let y_last: number | null = null;
+
 //#region Frame
   function renderFrame() {
     const deltaTime = getDeltaTime();
     camera.tetherDistance = params.cameraDistance;
     camera.spinSpeed = Number(params.cameraSpin) * 0.2;
+
+    if (dragging && touch_x && touch_y)
+    {
+      if (x_last && y_last)
+      {
+        const dx = touch_x - x_last;
+        const dy = touch_y - y_last;
+        camera.addRotation(dx * cam_sens * deltaTime, dy * cam_sens * deltaTime);
+      }
+
+      x_last = touch_x;
+      y_last = touch_y;
+    }
     camera.tick(deltaTime);
 
     // Model
@@ -145,7 +189,6 @@ async function InitWebGPU() {
     // View
     const fov = 1.0472; // 60 deg, vertical FoV
     const a = canvas.clientWidth/canvas.clientHeight;
-    console.log(canvas.clientWidth, canvas.clientHeight, canvas.width, canvas.height);
 
     const viewMatrix = lookAt(
       camera.getPosition(),
@@ -167,7 +210,7 @@ async function InitWebGPU() {
         format: "depth32float",
         usage: GPUTextureUsage.RENDER_ATTACHMENT
       });
-      device.pushErrorScope('validation');
+      device.popErrorScope().then(e => e && console.error('depth texture error:', e.message));
     }
 
     const commandEncoder = device.createCommandEncoder({
@@ -202,14 +245,6 @@ async function InitWebGPU() {
     device.queue.submit([commandEncoder.finish()])
     device.popErrorScope().then(e => e && console.error('error:', e.message));
     requestAnimationFrame(renderFrame);
-    // console.log(`Camera Position: ${camera.getPosition()}`);
-    console.log('canvas', canvas.clientWidth, canvas.clientHeight, canvas.width, canvas.height);
-    console.log('eye', Array.from(camera.getPosition()));
-    console.log('fov', camera.verticalFov, 'near', camera.clipNear, 'far', camera.clipFar);
-    console.log('model', Array.from(modelMatrix));
-    console.log('view', Array.from(viewMatrix));
-    console.log('proj', Array.from(projectionMatrix));
-    console.log('mvp', Array.from(mvp));
   }
 //#endregion
   requestAnimationFrame(renderFrame);
