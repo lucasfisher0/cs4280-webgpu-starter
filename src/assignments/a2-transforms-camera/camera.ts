@@ -10,8 +10,8 @@ export class Camera {
   rotation: Float32Array = new Float32Array([0, 0, 0]);
   spinSpeed: number = 0.2; // Speed to spin in radians/sec
 
-  clipNear: number = 0.1;
-  clipFar: number  = 100.0;
+  clipNear: number = 1;
+  clipFar: number  = 50;
   verticalFov: number = 1.0472; // 60 deg, vertical FoV
 
   /** Camera position derived from tether distance + yaw/pitch. */
@@ -34,6 +34,16 @@ export class Camera {
     const DEG_89 = 1.55334303;
     if(Math.abs(this.rotation[1]) > DEG_89)
       this.rotation[1] = DEG_89 * Math.sign(this.rotation[1]);
+  }
+
+  getViewMatrix(target?: Float32Array) {
+    target ??= new Float32Array([0, 0, 0]);
+
+    return lookAt(
+      this.getPosition(),
+      target,
+      new Float32Array([0, 1, 0]),
+    );
   }
 
   tick(deltaTime: number) {
