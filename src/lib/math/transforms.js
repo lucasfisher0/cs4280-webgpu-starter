@@ -54,10 +54,10 @@ export function rotateY(_radians) {
   const s = Math.sin(_radians);
 
   return new Float32Array([
-    c, 0, s, 0,
-    0, 1, 0, 0,
-    s, 0, c, 0,
-    0, 0, 0, 1,
+     c, 0, s, 0,
+     0, 1, 0, 0,
+    -s, 0, c, 0,
+     0, 0, 0, 1,
   ]);
 }
 
@@ -68,7 +68,7 @@ export function rotateZ(_radians) {
   return new Float32Array([
     c, -s, 0, 0,
     s,  c, 0, 0,
-    0,  0, 0, 0,
+    0,  0, 1, 0,
     0,  0, 0, 1,
   ]);
 }
@@ -76,20 +76,15 @@ export function rotateZ(_radians) {
 /** A view matrix placing the camera at `eye`, looking toward `target`. */
 export function lookAt(_eye, _target, _up) {
   // Construct Camera Basis
-  const f = Vec3.normalize(_target - _eye);
+  const f = Vec3.normalize(Vec3.sub(_target, _eye));
   const r = Vec3.normalize(Vec3.cross(f, _up));
   const u = Vec3.cross(r, f);
 
-  let view = new Float32Array(16);
-  view.set(f, 0);
-  view.set(r, 4);
-  view.set(u, 8);
-
   return new Float32Array([
-    r[0],    r[1],  r[1], -Vec3.dot(r, _eye),
-    u[0],    u[1],  u[1], -Vec3.dot(u, _eye),
-    -f[0],  -f[1], -f[1],  Vec3.dot(f, _eye),
-    0,       0,     0,     1,
+     r[0],   r[1],  r[2], -Vec3.dot(r, _eye),
+     u[0],   u[1],  u[2], -Vec3.dot(u, _eye),
+    -f[0],  -f[1], -f[2],  Vec3.dot(f, _eye),
+     0,      0,     0,     1,
   ]);
 }
 
@@ -98,28 +93,27 @@ export function lookAt(_eye, _target, _up) {
  * depth range (unlike OpenGL's `[-1, 1]`).
  */
 export function perspective(_fovYRadians, _aspect, _near, _far) {
-  const s = 1/(Math.tan(_fovYRadians/2));
+  const s = 1 / (Math.tan(_fovYRadians / 2));
   return new Float32Array([
     s/_aspect,    0,      0,                   0,
     0,            s,      0,                   0,
-    0,            0,      _far/(_near-_far),   (-2*_far*_near)/(_near-_far),
-    0,            0,      -1,                   0,
+    0,            0,      _far/(_near-_far),   (_far*_near)/(_near-_far),
+    0,            0,      -1,                  0,
   ]);
 }
 
 // Intrinsic Z-Y-X Euler angles (yaw * pitch * roll) — a common convention
 // and a direct source of gimbal lock when pitch approaches +/-90 degrees.
 export function fromEulerZYX(_yaw, _pitch, _roll) {
-  //return Mat4.multiply(rotateZ(_yaw), Mat4.multiply(rotateY(_pitch), rotateX(_roll)));
-  return Mat4.multiply(rotateZ(_yaw), Mat4.multiply(rotateY(_pitch), rotateX(_roll)));
+  return Mat4.multiplyAll([rotateX(_roll), rotateY(_pitch), rotateZ(_yaw)]);
 }
 
 /** An orthographic projection matrix, same `z` in `[0, 1]` convention as `perspective`. */
 export function ortho(_left, _right, _bottom, _top, _near, _far) {
   return new Float32Array([
-    2/(_right-1), 0,      0,                -(_right+1)/(_right-1),
-    0,            1,      2/(_top-_bottom), -(_top+_bottom)/(_top-_bottom),
-    0,            0,      2/(_near-_far),    _near/(_near-_far),
-    0,            0,      0,                 1,
+    2/(_right-_left), 0,                     0,                 -(_right+_left)/(_right-_left),
+    0,                2/(_top-_bottom),      0,                 -(_top+_bottom)/(_top-_bottom),
+    0,                0,                     1/(_near-_far),    _near/(_near-_far),
+    0,                0,                     0,                 1,
   ]);
 }

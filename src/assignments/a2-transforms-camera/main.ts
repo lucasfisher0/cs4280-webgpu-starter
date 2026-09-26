@@ -49,16 +49,17 @@ async function InitWebGPU() {
   const device: GPUDevice = await adapter.requestDevice();
   const format = navigator.gpu.getPreferredCanvasFormat();
   const context = configureContext(canvas, device, format);
-  context.configure({device, format, alphaMode: "opaque"})
 //#endregion
 
 //#region Uniform
   const UNIFORM_SIZE: number = 16 * 4; // one mat4x4<f32>: mvp
+  device.pushErrorScope('validation');
   let uniformBuffer: GPUBuffer = device.createBuffer({
     label: "transform-uniform",
     size: UNIFORM_SIZE,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
+  device.popErrorScope().then(e => e && console.error('uniform buffer error:', e.message));
 
   const bindGroupLayout: GPUBindGroupLayout = device.createBindGroupLayout({
     label: "u-layout",
@@ -69,6 +70,7 @@ async function InitWebGPU() {
     }]
   });
 
+  device.pushErrorScope('validation');
   const bindGroup: GPUBindGroup = device.createBindGroup({
     label: "u-group",
     layout: bindGroupLayout,
@@ -77,6 +79,7 @@ async function InitWebGPU() {
       resource: {buffer: uniformBuffer}
     }]
   });
+  device.popErrorScope().then(e => e && console.error('bindgroup error:', e.message));
 //#endregion
 
 //#region CUBE
@@ -87,8 +90,11 @@ async function InitWebGPU() {
   })
   device.queue.writeBuffer(vertexBuffer, 0, CUBE_VERTICES);
 
+  device.pushErrorScope('validation');
   const shaderModule = createShaderModule(device, shaderCode, "cube");
+  device.popErrorScope().then(e => e && console.error('shader module error:', e.message));
 
+  device.pushErrorScope('validation');
   const pipeline = device.createRenderPipeline({
     label: "the-pipeline",
     layout: device.createPipelineLayout({
@@ -101,8 +107,8 @@ async function InitWebGPU() {
         {
           arrayStride: 6 * 4, // Float32 per vertex * bytes per float32
           attributes: [
-            {shaderLocation: 0, offset: 0, format: "float32x2"},
-            {shaderLocation: 1, offset: 3 * 4, format: "float32x2"}
+            {shaderLocation: 0, offset: 0, format: "float32x3"},
+            {shaderLocation: 1, offset: 3 * 4, format: "float32x3"}
           ]
         }
       ]
@@ -119,6 +125,7 @@ async function InitWebGPU() {
       format: 'depth32float'
     }
   });
+  device.popErrorScope().then(e => e && console.error('pipeline error:', e.message));
 //#endregion
 
   let depthTexture: GPUTexture | null = null;
@@ -138,11 +145,12 @@ async function InitWebGPU() {
     // View
     const fov = 1.0472; // 60 deg, vertical FoV
     const a = canvas.clientWidth/canvas.clientHeight;
+    console.log(canvas.clientWidth, canvas.clientHeight, canvas.width, canvas.height);
 
     const viewMatrix = lookAt(
       camera.getPosition(),
       new Float32Array([0, 0, 0]),
-      new Float32Array([0, 0, 1]),
+      new Float32Array([0, 1, 0]),
     );
 
     // Projection
@@ -153,11 +161,13 @@ async function InitWebGPU() {
     if (depthTexture && (depthTexture.width !== canvasTexture.width || depthTexture.height !== canvasTexture.height))
       depthTexture.destroy();
     if (!depthTexture) {
+      device.pushErrorScope('validation');
       depthTexture = device.createTexture({
         size: [canvasTexture.width, canvasTexture.height],
         format: "depth32float",
         usage: GPUTextureUsage.RENDER_ATTACHMENT
       });
+      device.pushErrorScope('validation');
     }
 
     const commandEncoder = device.createCommandEncoder({
@@ -188,9 +198,18 @@ async function InitWebGPU() {
     // TODO GIZMO PASS
     passEncoder.end();
 
+    device.pushErrorScope('validation');
     device.queue.submit([commandEncoder.finish()])
+    device.popErrorScope().then(e => e && console.error('error:', e.message));
     requestAnimationFrame(renderFrame);
     // console.log(`Camera Position: ${camera.getPosition()}`);
+    console.log('canvas', canvas.clientWidth, canvas.clientHeight, canvas.width, canvas.height);
+    console.log('eye', Array.from(camera.getPosition()));
+    console.log('fov', camera.verticalFov, 'near', camera.clipNear, 'far', camera.clipFar);
+    console.log('model', Array.from(modelMatrix));
+    console.log('view', Array.from(viewMatrix));
+    console.log('proj', Array.from(projectionMatrix));
+    console.log('mvp', Array.from(mvp));
   }
 //#endregion
   requestAnimationFrame(renderFrame);

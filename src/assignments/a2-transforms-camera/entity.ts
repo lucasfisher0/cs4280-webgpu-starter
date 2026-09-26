@@ -16,6 +16,7 @@ export class Entity {
   }
 
   getTransformMatrix(): Float32Array {
-    return multiplyAll([this.translation, this.rotation, this.scale ]);
+    //return multiplyAll([this.scale, this.rotation, this.translation]);
+    return multiplyAll([this.translation, this.rotation, this.scale]);
   }
 }

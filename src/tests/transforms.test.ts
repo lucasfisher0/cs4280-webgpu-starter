@@ -1,23 +1,10 @@
 import { describe, expect, test } from "vitest";
-// import { translate, scale, rotateX, rotateY, rotateZ, lookAt, perspective, fromEulerZYX, ortho} from "./transforms";
+import {lookAt} from "@/lib/math/transforms";
+import * as Vec3 from "@/lib/math/vec3.js";
 
-/*
-describe("View Transformations", () => {
+describe("lookAt", () => {
+  const eye = [0, 0, 5];
+  const target = [0, 0, 0];
+  const up = [0, 1, 0];
+
 });
-*/
-
-
-describe('Math.sqrt', () => {
-  test('returns the square root of perfect squares', () => {
-    expect(Math.sqrt(4)).toBe(2)
-    expect(Math.sqrt(9)).toBe(3)
-  })
-
-  test('returns NaN for negative numbers', () => {
-    expect(Math.sqrt(-1)).toBeNaN()
-  })
-
-  test('returns 0 for 0', () => {
-    expect(Math.sqrt(0)).toBe(0)
-  })
-})

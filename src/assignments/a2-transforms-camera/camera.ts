@@ -16,7 +16,7 @@ export class Camera {
 
   getPosition(): Float32Array {
     // TODO: FIXME
-    return new Float32Array([0, 0, -this.tetherDistance]);
+    return new Float32Array([3, 3, 3]);
 
     // This should return vec3 coordinates instead of a matrix
     let position = translate(0, 0, -this.tetherDistance);

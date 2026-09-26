@@ -1,5 +1,5 @@
 struct Uniforms {
-    MVP: mat4x4<f32>
+  MVP: mat4x4<f32>
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -10,11 +10,10 @@ struct VertexOutput {
 };
 
 @vertex
-fn vertexMain(@location(0) position: vec2<f32>, @location(1) normal: vec3<f32>) -> VertexOutput {
+fn vertexMain(@location(0) position: vec3<f32>, @location(1) normal: vec3<f32>) -> VertexOutput {
   var out: VertexOutput;
-  let newPosition = uniforms.MVP * vec4<f32>(position, 0.0, 1.0);
-  out.position = vec4f(newPosition.xy / (1.0 + newPosition.z), newPosition.zw);
-  out.color = normal;
+  out.position = uniforms.MVP * vec4<f32>(position, 1.0);
+  out.color = normal * 0.5 + 0.5; // remap [-1,1] to [0,1]
   return out;
 }
 
