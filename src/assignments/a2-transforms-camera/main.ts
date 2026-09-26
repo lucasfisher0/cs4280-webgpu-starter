@@ -7,7 +7,7 @@ import {configureContext} from "@/lib/webgpu/context";
 import GUI from "lil-gui";
 import {Entity} from "@/assignments/a2-transforms-camera/entity";
 import {identity, invert, multiply, multiplyAll} from "@/lib/math/mat4";
-import {lookAt, perspective, scale as matrixScale, shear} from "@/lib/math/transforms";
+import {lookAt, ortho, perspective, scale as matrixScale, shear} from "@/lib/math/transforms";
 
 //#region GUI
 const gui = new GUI( { container: document.getElementById( 'controlBox' )! } );
@@ -56,8 +56,6 @@ async function InitWebGPU() {
   const context = configureContext(canvas, device, format);
 //#endregion
 
-  let touch_x: number | null = null;
-  let touch_y: number | null = null;
   canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId);
     pointer_pos = [e.clientX, e.clientY];
@@ -66,8 +64,8 @@ async function InitWebGPU() {
   canvas.addEventListener("pointermove", (e) => {
     pointer_pos = [e.clientX, e.clientY];
   });
-  canvas.addEventListener("pointerup", () => { dragging = false; });
-  canvas.addEventListener("pointercancel", () => { dragging = false; });
+  canvas.addEventListener("pointerup", () => { dragging = false; pointer_last = null; });
+  canvas.addEventListener("pointercancel", () => { dragging = false; pointer_last = null; });
 
 
 //#region Uniform
@@ -137,11 +135,15 @@ async function InitWebGPU() {
       entryPoint: "fragmentMain",
       targets: [{format: format}]
     },
-    primitive: {topology: "triangle-list"},
+    primitive: {
+      topology: "triangle-list",
+      cullMode: "back",
+      frontFace: "cw"
+    },
     depthStencil: {
       depthWriteEnabled: true,
       depthCompare: 'less',
-      format: 'depth32float'
+      format: 'depth24plus'
     }
   });
   device.popErrorScope().then(e => e && console.error('pipeline error:', e.message));
@@ -174,19 +176,10 @@ async function InitWebGPU() {
     let modelMatrix = cube.getTransformMatrix();
     modelMatrix = multiply(modelMatrix, shear(params.shearX, 0, params.shearY, 0, params.shearZ, 0));
 
-    // View
-    const fov = 1.0472; // 60 deg, vertical FoV
-    const a = canvas.clientWidth/canvas.clientHeight;
-
-    const viewMatrix = lookAt(
-      camera.getPosition(),
-      new Float32Array([0, 0, 0]),
-      new Float32Array([0, 1, 0]),
-    );
-
     // Projection
+    const a = canvas.clientWidth/canvas.clientHeight;
     const projectionMatrix = perspective(camera.verticalFov, a, camera.clipNear, camera.clipFar);
-    const mvp = multiplyAll([modelMatrix, viewMatrix, projectionMatrix]);
+    const mvp = multiplyAll([modelMatrix, camera.getViewMatrix(), projectionMatrix]);
 
     const canvasTexture = context.getCurrentTexture();
     if (depthTexture && (depthTexture.width !== canvasTexture.width || depthTexture.height !== canvasTexture.height))
@@ -195,7 +188,7 @@ async function InitWebGPU() {
       device.pushErrorScope('validation');
       depthTexture = device.createTexture({
         size: [canvasTexture.width, canvasTexture.height],
-        format: "depth32float",
+        format: "depth24plus",
         usage: GPUTextureUsage.RENDER_ATTACHMENT
       });
       device.popErrorScope().then(e => e && console.error('depth texture error:', e.message));
