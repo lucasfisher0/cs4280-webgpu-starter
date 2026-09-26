@@ -37,7 +37,10 @@ function getDeltaTime(): number {
 //#endregion
 
 const camera = new Camera();
-
+const cam_sens = 1;
+let pointer_pos: number[] | null = null;
+let pointer_last: number[] | null = null;
+let dragging = false;
 
 const cube = new Entity();
 
@@ -53,30 +56,18 @@ async function InitWebGPU() {
   const context = configureContext(canvas, device, format);
 //#endregion
 
-  const cam_sens = 0.005;
-  let dragging = false;
   let touch_x: number | null = null;
   let touch_y: number | null = null;
-
-  canvas.addEventListener("touchstart", (e) => {
-    e.preventDefault();
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    pointer_pos = [e.clientX, e.clientY];
     dragging = true;
-    console.warn("drag")
-  }, {passive: false});
-  canvas.addEventListener("touchend", () => {
-    dragging = false;
   });
-  canvas.addEventListener("touchcancel", () => {
-    dragging = false;
+  canvas.addEventListener("pointermove", (e) => {
+    pointer_pos = [e.clientX, e.clientY];
   });
-
-  window.addEventListener("touchmove", (e) => {
-    e.preventDefault();
-    if (!dragging) return;
-
-    touch_x = e.touches[0].clientX;
-    touch_y = e.touches[0].clientY;
-  }, {passive: false});
+  canvas.addEventListener("pointerup", () => { dragging = false; });
+  canvas.addEventListener("pointercancel", () => { dragging = false; });
 
 
 //#region Uniform
@@ -158,8 +149,6 @@ async function InitWebGPU() {
 
   let depthTexture: GPUTexture | null = null;
 
-  let x_last: number | null = null;
-  let y_last: number | null = null;
 
 //#region Frame
   function renderFrame() {
@@ -167,17 +156,16 @@ async function InitWebGPU() {
     camera.tetherDistance = params.cameraDistance;
     camera.spinSpeed = Number(params.cameraSpin) * 0.2;
 
-    if (dragging && touch_x && touch_y)
+    if (dragging && pointer_pos)
     {
-      if (x_last && y_last)
+      if (pointer_last)
       {
-        const dx = touch_x - x_last;
-        const dy = touch_y - y_last;
+        const dx = pointer_pos[0] - pointer_last[0];
+        const dy = pointer_pos[1] - pointer_last[1];
         camera.addRotation(dx * cam_sens * deltaTime, dy * cam_sens * deltaTime);
       }
 
-      x_last = touch_x;
-      y_last = touch_y;
+      pointer_last = pointer_pos;
     }
     camera.tick(deltaTime);
 
