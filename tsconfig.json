@@ -1,18 +1,19 @@
 {
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
+    "skipLibCheck": true,
     // File Layout
-    // "rootDir": "./src",
-    // "outDir": "./dist",
+    "rootDir": "./src",
+    "outDir": "./dist",
     "paths": {
         "@/*": ["./src/*"]
     },
 
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
-    "module": "esnext",
-    "target": "es2023",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["vite/client", "web"],//, "@webgpu/types"],
 
     // Other Outputs
@@ -30,7 +31,8 @@
     "allowImportingTsExtensions": false,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
-    "noEmit": false,
+    "noEmit": true,
+    "isolatedModules": true,
 
     // JavaScript Support
     "allowJs": true,
@@ -48,15 +50,14 @@
     "noPropertyAccessFromIndexSignature": true,
 
     // Check if these are needed:
-    "isolatedModules": true,
     "noUncheckedSideEffectImports": true
   },
   "include": [
-    "src/**",
+    "./src",
   ],
   "exclude": [
-    "tests/**/*.spec.ts",
-    "node_modules",
-    "dist"
+    "./src/tests",
+    "./node_modules",
+    "./dist"
   ]
 }

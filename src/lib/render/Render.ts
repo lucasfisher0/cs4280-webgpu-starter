@@ -20,8 +20,10 @@ interface RenderTick {
   deltaTime: number;
   drag_movement: PointerMovement;
 }
+export type { RenderTick };
+
 const tickData: RenderTick = {deltaTime: 0.0, drag_movement: [0.0, 0.0]};
-const renderTickEvent = new CustomEvent<RenderTick>('tick', {
+export const renderTickEvent = new CustomEvent<RenderTick>("tick", {
   detail: tickData,
   bubbles: true
 });
@@ -51,6 +53,7 @@ export class Renderer {
     if (!adapter)
       throw new Error("Render constructor was not given a valid adapter.");
     this.adapter = adapter;
+    this.format = navigator.gpu.getPreferredCanvasFormat();
 
     if (canvas)
       this.#canvas = canvas;
@@ -83,7 +86,7 @@ export class Renderer {
     this.context = configureContext(this.#canvas, this.device!, this.format!);
   }
 
-  private async init() {
+  async init() {
     this.device = await this.adapter.requestDevice();
     if (this.#canvas)
       this.setCanvas(this.#canvas);
@@ -104,8 +107,8 @@ export class Renderer {
       if (this.pointer_last)
       {
         tickData.drag_movement = [
-          this.pointer_pos[0] - this.pointer_last[0],
-          this.pointer_pos[1] - this.pointer_last[1]];
+          this.pointer_pos[0]! - this.pointer_last[0]!,
+          this.pointer_pos[1]! - this.pointer_last[1]!];
       }
       this.pointer_last = this.pointer_pos;
     }
@@ -192,6 +195,7 @@ export class Renderer {
       }
     })
 
+    /*
     this.device.queue.writeBuffer(uniformBuffer, 0, transpose(mvp));
     passEncoder.setPipeline(pipeline);
     passEncoder.setVertexBuffer(0, vertexBuffer);
@@ -202,6 +206,7 @@ export class Renderer {
     passEncoder.setVertexBuffer(0, axisBuffer);
     passEncoder.setBindGroup(0, bindGroup);
     passEncoder.draw(6);
+    */
 
     passEncoder.end();
     this.device.pushErrorScope('validation');

@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build-nocheck": "tsc --nocheck && vite build",
     "preview": "vite preview",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

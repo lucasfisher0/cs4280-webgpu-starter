@@ -279,8 +279,8 @@ async function InitWebGPU() {
     {
       if (pointer_last)
       {
-        const dx = pointer_pos[0] - pointer_last[0];
-        const dy = pointer_pos[1] - pointer_last[1];
+        const dx = pointer_pos[0]! - pointer_last[0]!;
+        const dy = pointer_pos[1]! - pointer_last[1]!;
         camera.addRotation(dx * cam_sens * deltaTime, dy * cam_sens * deltaTime);
       }
 

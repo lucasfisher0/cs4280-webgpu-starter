@@ -1,10 +1,9 @@
 import {createShaderModule} from "@/lib/webgpu/shaders";
 // @ts-ignore
 import shaderCode from "./shaders.wgsl?raw";
-import {CUBE_VERTICES, AXIS_VERTICES} from "./cube";
-import {Camera} from "./camera";
-import {configureContext} from "@/lib/webgpu/context";
-import GUI, {Controller} from "lil-gui";
+import {Camera} from "@/lib/render/Camera";
+import type {RenderTick} from "@/lib/render/Render"
+import {GUI, Controller} from "lil-gui";
 import {Entity} from "@/assignments/a2-transforms-camera/entity";
 import * as Mat4 from "@/lib/math/mat4";
 import {
@@ -19,9 +18,10 @@ import {
 import {Renderer} from "@/lib/render/Render";
 
 import {Material, DEFAULT_MATERIAL} from "@/lib/render/Material";
+DEFAULT_MATERIAL.shader = ["DEFAULT", shaderCode];
+
 import {makeTetrahedron} from "@/assignments/a3-sierpinski-gasket/tetrahedron";
 
-DEFAULT_MATERIAL.shader = ["DEFAULT", shaderCode];
 
 function deg2rad(deg: number) {
   return deg * Math.PI / 180;
@@ -37,12 +37,25 @@ const params = {
   specularLight: {r: 128, g: 128, b: 128},
   exponent: 10,
 };
-gui.add(params, 'order', ["TRS-Shear", "Shear-TRS"])
-gui.add(params, 'order', 0.0, 20.0, 1.0)
+
+
+const folderCamera = gui.addFolder("Camera");
+const distanceControl = folderCamera.add(params, "cameraDistance", 2, 12, 0.1).name("Distance");
+folderCamera.add(params, "cameraSpin").name("Spin");
+
+const folderTransform = gui.addFolder( "Translate" );
+for (const key in params.lightPosition) {
+  const elem = folderTransform.add(params.lightPosition, key as keyof typeof params.lightPosition, -1, 1)
+    .name(key.toUpperCase())
+    .domElement!.parentElement!;
+
+  elem.classList.add("inline-gui-property");
+  elem.style = "width: 33.33%;";
+}
+
 //#endregion
 
 const camera = new Camera();
-const cam_sens = 1;
 
 const tetrahedron = new Entity();
 const tetrahedron_verts = makeTetrahedron();
@@ -54,6 +67,7 @@ async function InitWebGPU() {
   }
   const canvas = document.getElementById("canvas")! as HTMLCanvasElement;
   const renderer = new Renderer(adapter, canvas);
+  await renderer.init();
 
 
 //#region UNIFORM
@@ -139,6 +153,8 @@ async function InitWebGPU() {
   device.popErrorScope().then(e => e && console.error('cube pipeline error:', e.message));
   */
 //#endregion
+
+
   /*
     const axisBuffer = device.createBuffer({
       label: "axis-vertices",
@@ -182,12 +198,15 @@ async function InitWebGPU() {
     device.popErrorScope().then(e => e && console.error('axis pipeline error:', e.message));
     */
 
+
+
+  addEventListener("tick", (e: Event) => {
+    const tickEvent = e as CustomEvent<RenderTick>;
+    tick(tickEvent.detail);
+  })
+
   function renderFrame() {
 
-    // TODO: Link Camera to Render::renderTickEvent
-    // camera.tetherDistance = params.cameraDistance;
-    // camera.spinSpeed = Number(params.cameraSpin) * 0.2;
-    // camera.tick(deltaTime);
 
     // Model
     const modelMatrix = Mat4.identity();
@@ -197,10 +216,16 @@ async function InitWebGPU() {
     const projectionMatrix = perspective(camera.verticalFov, a, camera.clipNear, camera.clipFar);
     const mvp = Mat4.multiplyAll([modelMatrix, camera.getViewMatrix(), projectionMatrix]);
 
-
+    renderer.renderFrame();
+    requestAnimationFrame(renderFrame);
   }
-
   requestAnimationFrame(renderFrame);
+}
+
+function tick(data: RenderTick) {
+  camera.tetherDistance = params.cameraDistance;
+  camera.spinSpeed = Number(params.cameraSpin) * 0.2;
+  camera.tick(data);
 }
 
 InitWebGPU();

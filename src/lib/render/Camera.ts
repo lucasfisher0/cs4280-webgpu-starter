@@ -1,4 +1,5 @@
-import { lookAt } from "@/lib/math/transforms.js";
+import {lookAt} from "@/lib/math/transforms.js";
+import {type RenderTick, renderTickEvent} from "@/lib/render/Render"
 
 /**
  * Custom camera class to encapsulate all behavior, such as positioning and controls.
@@ -9,13 +10,13 @@ export class Camera {
   spinSpeed: number = 0.2; // Speed to spin in radians/sec
 
   clipNear: number = 1;
-  clipFar: number  = 50;
+  clipFar: number = 50;
   verticalFov: number = 1.0472; // 60 deg, vertical FoV
 
   /** Camera position derived from tether distance + yaw/pitch. */
   getPosition(): Float32Array {
-    const yaw: number = this.rotation[0] ?? 0;
-    const pitch: number = this.rotation[1] ?? 0;
+    const yaw = this.rotation[0]!;
+    const pitch = this.rotation[1]!;
     const r = this.tetherDistance;
 
     return new Float32Array([
@@ -33,7 +34,7 @@ export class Camera {
     this.rotation[1]! += pitch;
 
     const DEG_89 = 1.55334303;
-    if(Math.abs(this.rotation[1]!) > DEG_89)
+    if (Math.abs(this.rotation[1]!) > DEG_89)
       this.rotation[1] = DEG_89 * Math.sign(this.rotation[1]!);
   }
 
@@ -47,7 +48,7 @@ export class Camera {
     );
   }
 
-  tick(deltaTime: number) {
-    this.rotation[0]! += this.spinSpeed * deltaTime;
+  tick(data: RenderTick) {
+    this.rotation[0]! += this.spinSpeed * data.deltaTime;
   }
 }
