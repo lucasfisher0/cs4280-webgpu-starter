@@ -54,9 +54,9 @@ a {
 .canvas-frame {
   position: relative;
   flex: 1 1 32rem;
-  min-height: 420px;
-  height: 70vh;
-  max-height: 640px;
+  min-height: 220px;
+  height: 50vh;
+  max-height: 320px;
   border-radius: 0.5rem;
   border: 1px solid var(--border);
   background: #000;

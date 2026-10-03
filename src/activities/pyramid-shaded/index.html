@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebGPU Shaded 3D Tetrahedron (Phong / Blinn-Phong)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-zinc-800 min-h-screen flex flex-col items-center p-6 font-sans">
+  <header class="text-center mb-4">
+    <h1 class="text-2xl font-bold text-white">WebGPU Shaded 3D Tetrahedron</h1>
+    <p class="text-xs text-zinc-400 mt-1">Per-fragment Phong and Blinn-Phong lighting with a point light,
+      computed in world space</p>
+  </header>
+
+  <main class="w-full max-w-2xl border border-zinc-800 rounded-xl overflow-hidden shadow-2xl relative">
+    <div class="relative aspect-[16/10] bg-black">
+      <canvas id="gpu-canvas" class="w-full h-full touch-none cursor-grab active:cursor-grabbing block"></canvas>
+    </div>
+
+    <div class="flex justify-between items-center px-4 py-2 border-t border-zinc-800 text-xs text-zinc-500">
+      <span>Drag on canvas to orbit view</span>
+      <span id="fps-label">FPS: --</span>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initializeWebGPU, Mesh, OrbitController, animate } from "./webgpu.js";
+    import * as mat4 from "@/lib/math/mat4.js";
+    import * as vec3 from "@/lib/math/vec3.js";
+    import GUI from "lil-gui";
+
+    const SHADING_MODELS = { "Phong": 0, "Blinn-Phong": 1, "Radiometric Blinn-Phong": 2 };
+
+    const state = {
+      spinSpeed: 1.0,
+      isSpinning: true,
+      fovDeg: 25,
+
+      // Lighting
+      shadingModel: SHADING_MODELS["Blinn-Phong"],
+      ambientColor: [0.2, 0.2, 0.25],
+      shadingColor: [1.0, 1.0, 1.0],   // diffuse light color
+      specularColor: [1.0, 1.0, 1.0],
+      ka: 1.0,
+      kd: 0.8,
+      ks: 0.6,
+      shininess: 32,
+      lightIntensity: Math.PI, // E_L, only used by the radiometric model
+      lightX: 1.5,
+      lightY: 1.5,
+      lightZ: 2.0,
+      orbitLight: false,
+
+      // Material
+      useFaceColors: true,
+      materialColor: [0.9, 0.5, 0.2],
+
+      resetView() {
+        state.fovDeg = 30;
+        state.spinSpeed = 1.0;
+        controller.distance = 3.5;
+        controller.rotX = 0.35;
+        controller.rotY = 0.45;
+        gui.controllersRecursive().forEach(c => c.updateDisplay());
+      }
+    };
+
+    let controller;
+    const gui = new GUI({ title: "Controls" });
+    const viewFolder = gui.addFolder("View");
+    viewFolder.add(state, "fovDeg", 25, 100, 1).name("FOV (°)");
+    viewFolder.add(state, "spinSpeed", 0, 3, 0.1).name("Spin Speed");
+    viewFolder.add(state, "isSpinning").name("Spinning");
+    viewFolder.add(state, "resetView").name("Reset View");
+
+    const lightFolder = gui.addFolder("Lighting");
+    lightFolder.add(state, "shadingModel", SHADING_MODELS).name("Model");
+    lightFolder.addColor(state, "ambientColor").name("Ambient Color");
+    lightFolder.addColor(state, "shadingColor").name("Shading (Diffuse) Color");
+    lightFolder.addColor(state, "specularColor").name("Specular Color");
+    lightFolder.add(state, "ka", 0, 1, 0.01).name("Ambient (ka)");
+    lightFolder.add(state, "kd", 0, 1, 0.01).name("Diffuse (kd)");
+    lightFolder.add(state, "ks", 0, 1, 0.01).name("Specular (ks)");
+    lightFolder.add(state, "shininess", 1, 256, 1).name("Shininess");
+    lightFolder.add(state, "lightIntensity", 0, 10, 0.01).name("Intensity E_L (Radiometric)");
+    lightFolder.add(state, "lightX", -5, 5, 0.1).name("Light X").listen();
+    lightFolder.add(state, "lightY", -5, 5, 0.1).name("Light Y");
+    lightFolder.add(state, "lightZ", -5, 5, 0.1).name("Light Z").listen();
+    lightFolder.add(state, "orbitLight").name("Orbit Light");
+
+    const materialFolder = gui.addFolder("Material");
+    materialFolder.add(state, "useFaceColors").name("Use Face Colors");
+    materialFolder.addColor(state, "materialColor").name("Material Color");
+
+    // --- Geometry ------------------------------------------------------
+    // Same tetrahedron as pyramid-mvp, but each face is now wound
+    // counter-clockwise when seen from *outside*, so that (a) cullMode
+    // 'back' culls the faces pointing away from the camera and (b) the
+    // right-hand-rule cross product gives an outward normal. (The
+    // pyramid-mvp faces are wound the other way, which is harmless for
+    // flat colors but would make every normal point inward.)
+    //
+    // Faces don't share vertices: each gets its own three copies so it can
+    // carry its own flat normal and color.
+    const P = {
+      top:   [0.0, 0.5, 0.0],
+      left:  [-0.5, -0.5, 0.0],
+      right: [0.5, -0.5, 0.0],
+      apex:  [0.0, 0.0, 0.5],
+    };
+
+    const faces = [
+      { verts: [P.top, P.right, P.left], color: [1.0, 1.0, 0.2] },
+      { verts: [P.top, P.apex, P.right], color: [0.2, 1.0, 0.2] },
+      { verts: [P.left, P.apex, P.top], color: [0.2, 0.2, 1.0] },
+      { verts: [P.right, P.apex, P.left], color: [1.0, 0.2, 1.0] },
+    ];
+
+    //  X Y Z | NX NY NZ | R G B  -> 9 floats (36 bytes) per vertex
+    const FLOATS_PER_VERTEX = 9;
+    const modelVertices = new Float32Array(faces.length * 3 * FLOATS_PER_VERTEX);
+    const modelIndices = new Uint16Array(faces.length * 3);
+    faces.forEach(({ verts, color }, f) => {
+      const normal = vec3.triangleNormal(verts[0], verts[1], verts[2]);
+      verts.forEach((p, v) => {
+        const i = f * 3 + v;
+        modelVertices.set([...p, ...normal, ...color], i * FLOATS_PER_VERTEX);
+        modelIndices[i] = i;
+      });
+    });
+
+    // --- Shaders -------------------------------------------------------
+    // The vertex shader forwards world-space position and normal; all
+    // lighting happens per fragment (Phong *shading*), so the specular
+    // highlight can move smoothly across a single flat face.
+    //
+    // Uniform layout (byte offsets), following WGSL uniform alignment
+    // rules — each vec3 is padded out to 16 bytes by the scalar after it:
+    //   0  mvp            mat4x4
+    //   64 model          mat4x4
+    //  128 normalMatrix   mat4x4   (inverse-transpose of model)
+    //  192 lightPos vec3,       204 shininess f32
+    //  208 eyePos vec3,         220 shadingModel u32
+    //  224 ambientColor vec3,   236 ka f32
+    //  240 shadingColor vec3,   252 kd f32
+    //  256 specularColor vec3,  268 ks f32
+    //  272 materialColor vec3,  284 useFaceColors u32
+    //  288 lightIntensity f32   (+12 bytes padding: struct size rounds up to 16)
+    //  304 total
+    const UNIFORM_SIZE = 304;
+
+    const wgslSource = `
+      struct Uniforms {
+        mvp           : mat4x4<f32>,
+        model         : mat4x4<f32>,
+        normalMatrix  : mat4x4<f32>,
+        lightPos      : vec3<f32>,
+        shininess     : f32,
+        eyePos        : vec3<f32>,
+        shadingModel  : u32,
+        ambientColor  : vec3<f32>,
+        ka            : f32,
+        shadingColor  : vec3<f32>,
+        kd            : f32,
+        specularColor : vec3<f32>,
+        ks            : f32,
+        materialColor : vec3<f32>,
+        useFaceColors : u32,
+        lightIntensity : f32,
+      };
+      @group(0) @binding(0) var<uniform> u : Uniforms;
+
+      const PI = 3.14159265;
+
+      struct VertexInput {
+        @location(0) position : vec3<f32>,
+        @location(1) normal   : vec3<f32>,
+        @location(2) color    : vec3<f32>,
+      };
+
+      struct VertexOutput {
+        @builtin(position) position : vec4<f32>,
+        @location(0) worldPos    : vec3<f32>,
+        @location(1) worldNormal : vec3<f32>,
+        @location(2) color       : vec3<f32>,
+      };
+
+      @vertex
+      fn vs_main(input : VertexInput) -> VertexOutput {
+        var output : VertexOutput;
+        output.position = u.mvp * vec4<f32>(input.position, 1.0);
+        output.worldPos = (u.model * vec4<f32>(input.position, 1.0)).xyz;
+        // w = 0: normals are directions, so translation must not apply.
+        output.worldNormal = (u.normalMatrix * vec4<f32>(input.normal, 0.0)).xyz;
+        output.color = input.color;
+        return output;
+      }
+
+      @fragment
+      fn fs_main(input : VertexOutput) -> @location(0) vec4<f32> {
+        // Interpolation shortens normals, so renormalize per fragment.
+        let N = normalize(input.worldNormal);
+        let L = normalize(u.lightPos - input.worldPos);   // toward light
+        let V = normalize(u.eyePos - input.worldPos);     // toward eye
+
+        var baseColor = u.materialColor;
+        if (u.useFaceColors == 1u) {
+          baseColor = input.color;
+        }
+
+        let ambient = u.ka * u.ambientColor * baseColor;
+
+        let NdotL = max(dot(N, L), 0.0);
+
+        if (u.shadingModel == 2u) {
+          // Radiometric Blinn-Phong:  Lr = (R / pi + ks * max(0, n.h)^p) * E
+          //   R = diffuse reflectance (kd * base color)
+          //   E = irradiance = E_L * lightColor * max(0, n.l)
+          // E carries the cosine, so the specular term fades out with it
+          // too — no separate NdotL > 0 check is needed.
+          let H = normalize(L + V);
+          let R = u.kd * baseColor;
+          let E = u.lightIntensity * u.shadingColor * NdotL;
+          let Lr = (R / PI + u.ks * u.specularColor * pow(max(dot(N, H), 0.0), u.shininess)) * E;
+          return vec4<f32>(min(ambient + Lr, vec3<f32>(1.0)), 1.0);
+        }
+        let diffuse = u.kd * NdotL * u.shadingColor * baseColor;
+
+        var specFactor = 0.0;
+        if (NdotL > 0.0) {
+          if (u.shadingModel == 0u) {
+            // Phong: compare the mirror reflection of L with the view dir.
+            let R = reflect(-L, N);
+            specFactor = pow(max(dot(R, V), 0.0), u.shininess);
+          } else {
+            // Blinn-Phong: compare the half-vector between L and V with N.
+            let H = normalize(L + V);
+            specFactor = pow(max(dot(N, H), 0.0), u.shininess);
+          }
+        }
+        let specular = u.ks * specFactor * u.specularColor;
+
+        return vec4<f32>(min(ambient + diffuse + specular, vec3<f32>(1.0)), 1.0);
+      }
+    `;
+
+    // --- CPU-side matrix math ---------------------------------------
+    // Column-major Float32Array(16), matching WGSL's mat4x4<f32> memory
+    // layout exactly (m[col * 4 + row]) so it can be uploaded as-is.
+
+    function mat4RotationX(theta) {
+      const cx = Math.cos(theta), sx = Math.sin(theta);
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        1, 0, 0, 0,
+        0, cx, sx, 0,
+        0, -sx, cx, 0,
+        0, 0, 0, 1,
+      ]);
+    }
+
+    function mat4RotationY(theta) {
+      const cy = Math.cos(theta), sy = Math.sin(theta);
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        cy, 0, -sy, 0,
+        0, 1, 0, 0,
+        sy, 0, cy, 0,
+        0, 0, 0, 1,
+      ]);
+    }
+
+    function mat4Translation(x, y, z) {
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        x, y, z, 1,
+      ]);
+    }
+
+    function mat4Perspective(fovRad, aspect, near, far) {
+      const f = 1.0 / Math.tan(fovRad * 0.5);
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, far / (near - far), -1,
+        0, 0, (near * far) / (near - far), 0,
+      ]);
+    }
+
+    async function init() {
+      try {
+        const { canvas, device, context, format } = await initializeWebGPU('gpu-canvas');
+
+        controller = new OrbitController(canvas, { distance: 3.5, rotX: 0.35, rotY: 0.45 });
+        const mesh = new Mesh(device, { vertices: modelVertices, indices: modelIndices });
+
+        const uniformBuffer = device.createBuffer({
+          size: UNIFORM_SIZE,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
+        // One ArrayBuffer, two views: most fields are f32, but the two
+        // flags are u32 and must be written with their integer bit pattern.
+        const uniformData = new ArrayBuffer(UNIFORM_SIZE);
+        const f32 = new Float32Array(uniformData);
+        const u32 = new Uint32Array(uniformData);
+
+        const shaderModule = device.createShaderModule({ code: wgslSource });
+        const bindGroupLayout = device.createBindGroupLayout({
+          entries: [{
+            binding: 0,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+            buffer: { type: 'uniform' }
+          }]
+        });
+        const bindGroup = device.createBindGroup({
+          layout: bindGroupLayout,
+          entries: [{ binding: 0, resource: { buffer: uniformBuffer } }]
+        });
+
+        const pipeline = device.createRenderPipeline({
+          layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
+          vertex: {
+            module: shaderModule,
+            entryPoint: 'vs_main',
+            buffers: [{
+              arrayStride: FLOATS_PER_VERTEX * 4,
+              attributes: [
+                { shaderLocation: 0, offset: 0, format: 'float32x3' },  // position
+                { shaderLocation: 1, offset: 12, format: 'float32x3' }, // normal
+                { shaderLocation: 2, offset: 24, format: 'float32x3' }  // color
+              ]
+            }]
+          },
+          fragment: {
+            module: shaderModule,
+            entryPoint: 'fs_main',
+            targets: [{ format }]
+          },
+          primitive: { topology: 'triangle-list', cullMode: 'back' },
+          depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' }
+        });
+
+        animate({
+          canvas,
+          device,
+          context,
+          fpsElementId: 'fps-label',
+          onFrame: ({ renderPass, dt, aspect, time }) => {
+            if (state.isSpinning && !controller.isDragging) {
+              controller.rotY += dt * 0.8 * state.spinSpeed;
+              controller.rotX += dt * 0.3 * state.spinSpeed;
+            }
+
+            if (state.orbitLight) {
+              // Circle the light around the world Y axis, keeping its radius.
+              const r = Math.hypot(state.lightX, state.lightZ) || 2.0;
+              state.lightX = r * Math.sin(time);
+              state.lightZ = r * Math.cos(time);
+            }
+
+            const model = mat4.multiply(mat4RotationX(controller.rotX), mat4RotationY(controller.rotY));
+            const view = mat4Translation(0, 0, -controller.distance);
+            const fovRad = (state.fovDeg * Math.PI) / 180;
+            const projection = mat4Perspective(fovRad, aspect, 0.1, 100.0);
+            const mvp = mat4.multiply(mat4.multiply(projection, view), model);
+            // Normals transform by the inverse-transpose of the model
+            // matrix. For this pure rotation it equals the model matrix,
+            // but computing it properly keeps non-uniform scale correct.
+            const normalMatrix = mat4.transpose(mat4.invert(model));
+            // The view is translate(0, 0, -distance), so the eye sits at
+            // (0, 0, distance) in world space.
+            const eyePos = [0, 0, controller.distance];
+
+            f32.set(mvp, 0);
+            f32.set(model, 16);
+            f32.set(normalMatrix, 32);
+            f32.set([state.lightX, state.lightY, state.lightZ, state.shininess], 48);
+            f32.set(eyePos, 52);
+            u32[55] = state.shadingModel;
+            f32.set([...state.ambientColor, state.ka], 56);
+            f32.set([...state.shadingColor, state.kd], 60);
+            f32.set([...state.specularColor, state.ks], 64);
+            f32.set(state.materialColor, 68);
+            u32[71] = state.useFaceColors ? 1 : 0;
+            f32[72] = state.lightIntensity;
+
+            device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+            renderPass.setPipeline(pipeline);
+            renderPass.setBindGroup(0, bindGroup);
+            mesh.draw(renderPass);
+          }
+        });
+      } catch (err) {
+        console.error("WebGPU Initialization Error:", err);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+
+</html>

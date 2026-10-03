@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebGPU Perspective 3D Tetrahedron (CPU-side MVP)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-zinc-800 min-h-screen flex flex-col items-center p-6 font-sans">
+  <header class="text-center mb-4">
+    <h1 class="text-2xl font-bold text-white">WebGPU Perspective 3D Tetrahedron</h1>
+    <p class="text-xs text-zinc-400 mt-1">Model/view/projection composed in JS, uploaded as one mat4x4&lt;f32&gt;
+      uniform</p>
+  </header>
+
+  <main class="w-full max-w-2xl border border-zinc-800 rounded-xl overflow-hidden shadow-2xl relative">
+    <div class="relative aspect-[16/10] bg-black">
+      <canvas id="gpu-canvas" class="w-full h-full touch-none cursor-grab active:cursor-grabbing block"></canvas>
+    </div>
+
+    <div class="flex justify-between items-center px-4 py-2 border-t border-zinc-800 text-xs text-zinc-500">
+      <span>Drag on canvas to orbit view</span>
+      <span id="fps-label">FPS: --</span>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initializeWebGPU, Mesh, OrbitController, animate } from "./webgpu.js";
+    import * as mat4 from "@/lib/math/mat4.js";
+    import GUI from "lil-gui";
+
+    const state = {
+      spinSpeed: 1.0,
+      isSpinning: true,
+      fovDeg: 25,
+      resetView() {
+        state.fovDeg = 30;
+        state.spinSpeed = 1.0;
+        controller.distance = 3.5;
+        controller.rotX = 0.35;
+        controller.rotY = 0.45;
+        gui.controllers.forEach(c => c.updateDisplay());
+      }
+    };
+
+    let controller;
+    const gui = new GUI({ title: "Controls" });
+    gui.add(state, "fovDeg", 25, 100, 1).name("FOV (°)");
+    gui.add(state, "spinSpeed", 0, 3, 0.1).name("Spin Speed");
+    gui.add(state, "isSpinning").name("Spinning");
+    gui.add(state, "resetView").name("Reset View");
+
+    const modelVertices = new Float32Array([
+      //  X     Y     Z     R    G    B
+      0.0, 0.5, 0.0, 1.0, 1.0, 0.2,
+      -0.5, -0.5, 0.0, 1.0, 1.0, 0.2,
+      0.5, -0.5, 0.0, 1.0, 1.0, 0.2,
+
+      0.0, 0.5, 0.0, 0.2, 1.0, 0.2,
+      0.5, -0.5, 0.0, 0.2, 1.0, 0.2,
+      0.0, 0.0, 0.5, 0.2, 1.0, 0.2,
+
+      -0.5, -0.5, 0.0, 0.2, 0.2, 1.0,
+      0.0, 0.5, 0.0, 0.2, 0.2, 1.0,
+      0.0, 0.0, 0.5, 0.2, 0.2, 1.0,
+
+      0.5, -0.5, 0.0, 1.0, 0.2, 1.0,
+      -0.5, -0.5, 0.0, 1.0, 0.2, 1.0,
+      0.0, 0.0, 0.5, 1.0, 0.2, 1.0
+    ]);
+
+    const modelIndices = new Uint16Array([
+      0, 1, 2,
+      3, 4, 5,
+      6, 7, 8,
+      9, 10, 11
+    ]);
+
+    // Vertex shader now just applies a precomputed MVP matrix — no trig,
+    // no matrix construction, no per-frame uniform scalars. Compare to
+    // hello-pyramid/index.html, where all of this ran here instead.
+    const wgslSource = `
+      struct Uniforms {
+        mvp : mat4x4<f32>,
+      };
+      @group(0) @binding(0) var<uniform> uniforms : Uniforms;
+
+      struct VertexInput {
+        @location(0) position : vec3<f32>,
+        @location(1) color    : vec3<f32>,
+      };
+
+      struct VertexOutput {
+        @builtin(position) position : vec4<f32>,
+        @location(0) color : vec3<f32>,
+      };
+
+      @vertex
+      fn vs_main(input : VertexInput) -> VertexOutput {
+        var output : VertexOutput;
+        output.position = uniforms.mvp * vec4<f32>(input.position, 1.0);
+        output.color = input.color;
+        return output;
+      }
+
+      @fragment
+      fn fs_main(input : VertexOutput) -> @location(0) vec4<f32> {
+        return vec4<f32>(input.color, 1.0);
+      }
+    `;
+
+    // --- CPU-side matrix math ---------------------------------------
+    // Column-major Float32Array(16), matching WGSL's mat4x4<f32> memory
+    // layout exactly (m[col * 4 + row]) so it can be uploaded as-is with
+    // no repacking. Each function below mirrors, entry for entry, the
+    // matrix that hello-pyramid's WGSL shader used to build on the GPU.
+
+    // function mat4Multiply(a, b) {
+    //   const out = new Float32Array(16);
+    //   for (let col = 0; col < 4; col++) {
+    //     for (let row = 0; row < 4; row++) {
+    //       let sum = 0;
+    //       for (let k = 0; k < 4; k++) sum += a[k * 4 + row] * b[col * 4 + k];
+    //       out[col * 4 + row] = sum;
+    //     }
+    //   }
+    //   return out;
+    // }
+
+    function mat4RotationX(theta) {
+      const cx = Math.cos(theta), sx = Math.sin(theta);
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        1, 0, 0, 0,
+        0, cx, sx, 0,
+        0, -sx, cx, 0,
+        0, 0, 0, 1,
+      ]);
+    }
+
+    function mat4RotationY(theta) {
+      const cy = Math.cos(theta), sy = Math.sin(theta);
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        cy, 0, -sy, 0,
+        0, 1, 0, 0,
+        sy, 0, cy, 0,
+        0, 0, 0, 1,
+      ]);
+    }
+
+    function mat4Translation(x, y, z) {
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        x, y, z, 1,
+      ]);
+    }
+
+    function mat4Perspective(fovRad, aspect, near, far) {
+      const f = 1.0 / Math.tan(fovRad * 0.5);
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, far / (near - far), -1,
+        0, 0, (near * far) / (near - far), 0,
+      ]);
+    }
+
+    async function init() {
+      try {
+        const { canvas, device, context, format } = await initializeWebGPU('gpu-canvas');
+
+        controller = new OrbitController(canvas, { distance: 3.5, rotX: 0.35, rotY: 0.45 });
+        const mesh = new Mesh(device, { vertices: modelVertices, indices: modelIndices });
+
+        // One mat4x4<f32> (16 floats = 64 bytes) instead of 5 packed scalars.
+        const uniformBuffer = device.createBuffer({
+          size: 64,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
+
+        const shaderModule = device.createShaderModule({ code: wgslSource });
+        const bindGroupLayout = device.createBindGroupLayout({
+          entries: [{ binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } }]
+        });
+        const bindGroup = device.createBindGroup({
+          layout: bindGroupLayout,
+          entries: [{ binding: 0, resource: { buffer: uniformBuffer } }]
+        });
+
+        const pipeline = device.createRenderPipeline({
+          layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
+          vertex: {
+            module: shaderModule,
+            entryPoint: 'vs_main',
+            buffers: [{
+              arrayStride: 24,
+              attributes: [
+                { shaderLocation: 0, offset: 0, format: 'float32x3' },
+                { shaderLocation: 1, offset: 12, format: 'float32x3' }
+              ]
+            }]
+          },
+          fragment: {
+            module: shaderModule,
+            entryPoint: 'fs_main',
+            targets: [{ format }]
+          },
+          primitive: { topology: 'triangle-list', cullMode: 'back' },
+          depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' }
+        });
+
+        animate({
+          canvas,
+          device,
+          context,
+          fpsElementId: 'fps-label',
+          onFrame: ({ renderPass, dt, aspect }) => {
+            if (state.isSpinning && !controller.isDragging) {
+              controller.rotY += dt * 0.8 * state.spinSpeed;
+              controller.rotX += dt * 0.3 * state.spinSpeed;
+            }
+
+            // Same model/view/projection composition the shader used to
+            // do, just built here instead: model = rotX * rotY, then
+            // mvp = proj * view * model.
+            const model = mat4.multiply(mat4RotationX(controller.rotX), mat4RotationY(controller.rotY));
+            const view = mat4Translation(0, 0, -controller.distance);
+            const fovRad = (state.fovDeg * Math.PI) / 180;
+            const projection = mat4Perspective(fovRad, aspect, 0.1, 100.0);
+            const mvp = mat4.multiply(mat4.multiply(projection, view), model);
+
+            device.queue.writeBuffer(uniformBuffer, 0, mvp);
+
+            renderPass.setPipeline(pipeline);
+            renderPass.setBindGroup(0, bindGroup);
+            mesh.draw(renderPass);
+          }
+        });
+      } catch (err) {
+        console.error("WebGPU Initialization Error:", err);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+
+</html>

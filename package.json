@@ -31,6 +31,7 @@
     "fsevents@2.3.3": true
   },
   "dependencies": {
-    "wgpu-matrix": "^3.4.2"
+    "vite": "^8.1.4",
+    "lil-gui": "^0.21.0"
   }
 }
