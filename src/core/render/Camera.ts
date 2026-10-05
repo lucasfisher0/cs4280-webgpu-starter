@@ -1,13 +1,16 @@
 import {lookAt} from "@/lib/math/transforms.js";
-import {type RenderTick, renderTickEvent} from "@/lib/render/Render"
+import {type RenderTick, renderTickEvent} from "@/core/render/Render"
+import {Entity} from "@/core/scenegraph/Entity";
 
+// TODO: inherit from Entity
 /**
  * Custom camera class to encapsulate all behavior, such as positioning and controls.
  */
 export class Camera {
   tetherDistance: number = 5;
-  rotation: Float32Array = new Float32Array([0, 0, 0]);
   spinSpeed: number = 0.2; // Speed to spin in radians/sec
+  rotation: Float32Array = new Float32Array([0, 0, 0]);
+
 
   clipNear: number = 1;
   clipFar: number = 50;

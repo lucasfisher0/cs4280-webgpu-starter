@@ -80,6 +80,5 @@ export function subdivideTetrahedron(_vertices: vec3[] = VERTS_TETRAHEDRON, dept
 
 
   M02,2, M23
-
    */
 }

@@ -1,11 +1,10 @@
 import {createShaderModule} from "@/lib/webgpu/shaders";
-// @ts-ignore
 import shaderCode from "./shaders.wgsl?raw";
 import {CUBE_VERTICES, AXIS_VERTICES} from "./cube";
 import {Camera} from "./camera";
 import {configureContext} from "@/lib/webgpu/context";
 import GUI, {Controller} from "lil-gui";
-import {Entity} from "@/assignments/a2-transforms-camera/entity";
+import {Entity} from "./entity";
 import {identity as matrixIdentity, multiply, multiplyAll, transpose} from "@/lib/math/mat4";
 import {
   fromEulerZYX,

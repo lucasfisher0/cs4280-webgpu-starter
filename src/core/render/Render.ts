@@ -1,6 +1,6 @@
 import {configureContext} from "@/lib/webgpu/context";
-import {Material, DEFAULT_MATERIAL} from "@/lib/render/Material";
-import {Model} from "@/lib/render/Model";
+import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
+import {Model} from "@/core/render/Model";
 import {createShaderModule} from "@/lib/webgpu/shaders";
 
 // export DEFAULT_SHADER = createShaderModule(device, shaderCode, "cube");

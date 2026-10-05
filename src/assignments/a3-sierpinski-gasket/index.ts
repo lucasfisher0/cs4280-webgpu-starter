@@ -1,8 +1,7 @@
 import {createShaderModule} from "@/lib/webgpu/shaders";
-// @ts-ignore
 import shaderCode from "./shaders.wgsl?raw";
-import {Camera} from "@/lib/render/Camera";
-import type {RenderTick} from "@/lib/render/Render"
+import {Camera} from "@/core/render/Camera";
+import type {RenderTick} from "@/core/render/Render"
 import {GUI, Controller} from "lil-gui";
 import {Entity} from "@/assignments/a2-transforms-camera/entity";
 import * as Mat4 from "@/lib/math/mat4";
@@ -15,12 +14,12 @@ import {
   translate as matrixTranslate
 } from "@/lib/math/transforms";
 
-import {Renderer} from "@/lib/render/Render";
-
-import {Material, DEFAULT_MATERIAL} from "@/lib/render/Material";
+import {Renderer} from "@/core/render/Render";
+import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
 DEFAULT_MATERIAL.shader = ["DEFAULT", shaderCode];
 
 import {makeTetrahedron} from "@/assignments/a3-sierpinski-gasket/tetrahedron";
+import {Model} from "@/core/render/Model";
 
 
 function deg2rad(deg: number) {
@@ -52,19 +51,18 @@ for (const key in params.lightPosition) {
   elem.classList.add("inline-gui-property");
   elem.style = "width: 33.33%;";
 }
-
 //#endregion
 
 const camera = new Camera();
 
-const tetrahedron = new Entity();
-const tetrahedron_verts = makeTetrahedron();
+const tetrahedron = new Model(makeTetrahedron(), null, "tetrahedron");
 
 async function InitWebGPU() {
   const adapter: GPUAdapter | null = await navigator.gpu.requestAdapter();
   if (!adapter) {
-    return;
+    return; // TODO: error popup
   }
+
   const canvas = document.getElementById("canvas")! as HTMLCanvasElement;
   const renderer = new Renderer(adapter, canvas);
   await renderer.init();
@@ -228,4 +226,4 @@ function tick(data: RenderTick) {
   camera.tick(data);
 }
 
-InitWebGPU();
+void InitWebGPU();
