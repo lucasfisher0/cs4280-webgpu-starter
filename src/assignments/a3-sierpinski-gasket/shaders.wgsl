@@ -10,6 +10,8 @@ struct Uniforms {
     lightPosition: vec4<f32>,     // RGB, Alpha is strength
     diffuse: vec3<f32>,           // RGB
     exponent: f32,
+    specularCo: f32,
+    _pad0: vec3<f32>
 };
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
@@ -40,14 +42,14 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4<f32> {
     // Diffuse
     let norm = normalize(in.normal);
     let lightDir = normalize(uniforms.lightPosition.xyz - in.worldPosition);
-    let diffuse = max(dot(norm, lightDir), 0.0) * uniforms.diffuse;
+    let diffuse = max(dot(norm, lightDir), 0.0) * uniforms.diffuse * uniforms.lightPosition.a;
 
     // Specular
     let viewDir = normalize(uniforms.cameraPosition - in.worldPosition);
     let halfDir = normalize(lightDir + viewDir);
     let angle = max(dot(norm, halfDir), 0.0);
     let spec = pow(angle, uniforms.exponent);
-    let specular = spec * (vec3<f32>(1.0, 1.0, 1.0) * uniforms.lightPosition.a);
+    let specular = spec * (vec3<f32>(1.0, 1.0, 1.0) * uniforms.lightPosition.a) * uniforms.specularCo;
 
     let color = ambient + diffuse + specular;
     return vec4<f32>(color, 1.0);

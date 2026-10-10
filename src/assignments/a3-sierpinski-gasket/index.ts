@@ -44,18 +44,20 @@ const params = {
   cameraDistance: 5,
   cameraSpin: true,
   depth: 1,
+  modelScale: 1,
   diffuse: {r: 1, g: 0, b: 1},
-  lightPosition: {x: 5, y: 5, z: 5},
-  lightStrength: 1,
+  lightPosition: {x: 0, y: 0, z: 0},
+  lightStrength: 0.8,
   ambientStrength: 0.2,
-  specularCoefficient: 10,
+  specularCoefficient: 0.8,
   exponent: 1000,
 };
 
 const folderModel = gui.addFolder("Model");
+folderModel.add(params, "modelScale", 0.5, 3, 0.25).name("Model Scale");
 const diffuseControl = folderModel.addColor(params, "diffuse").name("Diffuse Color");
 const depthControl = folderModel.add(params, "depth", 0, 5, 1).name("Recursion Depth").onChange(() => onDepthUpdated());
-const specularControl = folderModel.add(params, "specularCoefficient").name("Specular Coefficient");
+const specularControl = folderModel.add(params, "specularCoefficient", 0, 1, 0.1).name("Specular Coefficient");
 const exponentControl = folderModel.add(params, "exponent").name("Exponent");
 
 const folderCamera = gui.addFolder("Camera");
@@ -71,7 +73,7 @@ for (const key in params.lightPosition) {
   elem.classList.add("inline-gui-property");
   elem.style = "width: 33.33%;";
 }
-const lightStrengthControl = gui.add(params, "lightStrength").name("Light Strength");
+const lightStrengthControl = gui.add(params, "lightStrength", 0, 1.5, 0.1).name("Light Strength");
 const AmbientStrengthControl = gui.add(params, "ambientStrength", 0.0, 1, 0.05).name("Ambient Strength");
 //#endregion
 
@@ -129,7 +131,7 @@ async function InitWebGPU() {
 
 
 //#region UNIFORM
-    const UNIFORM_SIZE: number = 76 * 4;
+    const UNIFORM_SIZE: number = 84 * 4;
     device.pushErrorScope('validation');
     let uniformBuffer: GPUBuffer = device.createBuffer({
       label: "uniform",
@@ -258,7 +260,7 @@ async function InitWebGPU() {
     })
 
     // Uniform
-    const modelMatrix = Mat4.identity();
+    const modelMatrix = matrixScale(params.modelScale, params.modelScale, params.modelScale);
     device.queue.writeBuffer(uniformBuffer, 0, Mat4.transpose(modelMatrix));
 
     const viewMatrix = camera.getViewMatrix();
@@ -278,7 +280,7 @@ async function InitWebGPU() {
       [params.lightPosition.x, params.lightPosition.y, params.lightPosition.z, params.lightStrength]
     ));
     device.queue.writeBuffer(uniformBuffer, 288, new Float32Array(
-      [params.diffuse.r, params.diffuse.g, params.diffuse.b, params.exponent]
+      [params.diffuse.r, params.diffuse.g, params.diffuse.b, params.exponent, params.specularCoefficient]
     ));
 
     passEncoder.setPipeline(pipeline);
