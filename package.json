@@ -1,15 +1,17 @@
 {
   "name": "cs4280-webgpu-starter",
   "version": "0.1.0",
+  "author": "Lucas Fisher <lucasfisher0@gmail.com",
   "private": true,
   "type": "module",
-  "description": "Starter repository for CS 4280 (Computer Graphics). Plain JS + WebGPU, no framework — the infrastructure for every activity/assignment, with each assignment's graphics algorithm left for you to implement.",
+  "description": "Starter repository for CS 4280 (Computer Graphics). VITE/TypeScript, with custom implementations of WebGPU.",
   "engines": {
     "node": ">=20.19"
   },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build-nocheck": "tsc --nocheck && vite build",
     "preview": "vite preview",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -23,6 +25,7 @@
     "@types/web": "^0.0.356",
     "jsdom": "^30.0.1",
     "lil-gui": "^0.21.0",
+    "typegpu": "^0.12.6",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"
@@ -31,7 +34,7 @@
     "fsevents@2.3.3": true
   },
   "dependencies": {
-    "vite": "^8.1.4",
-    "lil-gui": "^0.21.0"
+    "lil-gui": "^0.21.0",
+    "vite": "^8.1.4"
   }
 }

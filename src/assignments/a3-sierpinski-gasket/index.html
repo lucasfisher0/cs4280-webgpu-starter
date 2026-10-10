@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css"/>     <!-- ROOT STYLESHEET -->
+  <title>Assignment 3 — 3D Sierpinksi Gasket · CS 4280</title>
+</head>
+
+<body>
+<script>
+  function toggleVisibility(id) {
+    const elem = document.getElementById(id);
+    if (elem)
+      elem.toggleAttribute("collapsed");
+  }
+</script>
+<div class="page">
+  <a class="back-link" href="/">← Back to course home</a>
+  <h1>Assignment 3 — 3D Sierpinksi Gasket</h1>
+  <h3>Technical Information</h3>
+  <ul>
+    <li>Fill out post submission.</li> .
+  </ul>
+
+  <h3>Post-Submission Questions</h3>
+
+  <p>Todo...</p>
+
+  <div class="layout">
+    <div class="canvas-frame drag-surface" id="canvasFrame">
+      <canvas id="canvas"></canvas>
+      <p id="status" class="status-overlay" hidden></p>
+    </div>
+    <div class="controls" id="controlBox">
+      <h3>Transform &amp; Camera Controls</h3>
+    </div>
+  </div>
+</div>
+<script type="module" src="./index.ts"></script>
+</body>
+</html>
