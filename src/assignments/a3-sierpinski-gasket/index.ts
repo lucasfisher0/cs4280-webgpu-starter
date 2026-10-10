@@ -43,7 +43,7 @@ const gui = new GUI( { container: document.getElementById( 'controlBox' )! } );
 const params = {
   cameraDistance: 5,
   cameraSpin: true,
-  depth: 0,
+  depth: 1,
   diffuse: {r: 1, g: 0, b: 1},
   lightPosition: {x: 5, y: 5, z: 5},
   lightStrength: 1,
@@ -57,7 +57,6 @@ const diffuseControl = folderModel.addColor(params, "diffuse").name("Diffuse Col
 const depthControl = folderModel.add(params, "depth", 0, 5, 1).name("Recursion Depth").onChange(() => onDepthUpdated());
 const specularControl = folderModel.add(params, "specularCoefficient").name("Specular Coefficient");
 const exponentControl = folderModel.add(params, "exponent").name("Exponent");
-
 
 const folderCamera = gui.addFolder("Camera");
 const distanceControl = folderCamera.add(params, "cameraDistance", 2, 12, 0.1).name("Distance");

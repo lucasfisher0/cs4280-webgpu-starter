@@ -73,9 +73,9 @@ function subdivideTetrahedron(_vertices: vec3[], depth: number = 0) : vec3[] {
 
   return [
     ...subdivideTetrahedron([v0!, m01, m02, m03], depth - 1),
-    ...subdivideTetrahedron([v1!, m01, m12, m13], depth - 1),
+    ...subdivideTetrahedron([v1!, m01, m13, m12], depth - 1),
     ...subdivideTetrahedron([v2!, m02, m12, m23], depth - 1),
-    ...subdivideTetrahedron([v3!, m03, m13, m23], depth - 1),
+    ...subdivideTetrahedron([v3!, m03, m23, m13], depth - 1),
   ];
 }
 
