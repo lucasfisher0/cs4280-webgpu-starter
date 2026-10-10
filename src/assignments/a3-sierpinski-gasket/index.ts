@@ -1,7 +1,7 @@
 import {createShaderModule} from "@/lib/webgpu/shaders";
 import shaderCode from "./shaders.wgsl?raw";
 import {Camera} from "@/core/render/Camera";
-import type {RenderTick} from "@/core/render/Render"
+import {type RenderTick, renderTickEvent} from "@/core/render/Render"
 import {GUI, Controller} from "lil-gui";
 import {Entity} from "@/assignments/a2-transforms-camera/entity";
 import * as Mat4 from "@/lib/math/mat4";
@@ -18,12 +18,21 @@ import {Renderer} from "@/core/render/Render";
 import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
 DEFAULT_MATERIAL.shader = ["DEFAULT", shaderCode];
 
-import {makeTetrahedron} from "@/assignments/a3-sierpinski-gasket/tetrahedron";
+import {makeTetrahedron, subdivideTetrahedron, VERTS_TETRAHEDRON} from "@/assignments/a3-sierpinski-gasket/tetrahedron";
 import {Model} from "@/core/render/Model";
+import {configureContext} from "@/lib/webgpu/context";
 
+type PointerMovement = [x: number, y: number];
 
 function deg2rad(deg: number) {
   return deg * Math.PI / 180;
+}
+
+let currTime: number | null = null;
+function getDeltaTime(): number {
+  const oldTime = currTime;
+  currTime = performance.now();
+  return !oldTime ? 0.0 : (currTime - oldTime) * 0.001;
 }
 
 //#region GUI
@@ -31,31 +40,46 @@ const gui = new GUI( { container: document.getElementById( 'controlBox' )! } );
 const params = {
   cameraDistance: 5,
   cameraSpin: true,
+  depth: 3,
+  diffuse: {r: 1, g: 0, b: 1},
   lightPosition: {x: 0, y: 0, z: 0},
-  ambientLight: {r: 128, g: 128, b: 128},
-  specularLight: {r: 128, g: 128, b: 128},
+  lightStrength: 5,
+  ambientStrength: 2,
+  specularCoefficient: 10,
   exponent: 10,
 };
+
+const folderModel = gui.addFolder("Model");
+const diffuseControl = folderModel.addColor(params, "diffuse").name("Diffuse Color");
+const depthControl = folderModel.add(params, "depth").name("Recursion Depth");
+const specularControl = folderModel.add(params, "specularCoefficient").name("Specular Coefficient");
+const exponentControl = folderModel.add(params, "exponent").name("Exponent");
 
 
 const folderCamera = gui.addFolder("Camera");
 const distanceControl = folderCamera.add(params, "cameraDistance", 2, 12, 0.1).name("Distance");
 folderCamera.add(params, "cameraSpin").name("Spin");
 
-const folderTransform = gui.addFolder( "Translate" );
+const folderLight = gui.addFolder( "Light Position" );
 for (const key in params.lightPosition) {
-  const elem = folderTransform.add(params.lightPosition, key as keyof typeof params.lightPosition, -1, 1)
+  const elem = folderLight.add(params.lightPosition, key as keyof typeof params.lightPosition, -1, 1)
     .name(key.toUpperCase())
     .domElement!.parentElement!;
 
   elem.classList.add("inline-gui-property");
   elem.style = "width: 33.33%;";
 }
+const lightStrengthControl = gui.add(params, "lightStrength").name("Light Strength");
+const AmbientStrengthControl = gui.add(params, "ambientStrength").name("Ambient Strength");
 //#endregion
 
 const camera = new Camera();
 
-const tetrahedron = new Model(makeTetrahedron(), null, "tetrahedron");
+let tetrahedronModel: Float32Array = onDepthUpdated();
+function onDepthUpdated(): Float32Array {
+  tetrahedronModel = new Float32Array(subdivideTetrahedron(VERTS_TETRAHEDRON, params.depth).flat(2));
+  return tetrahedronModel;
+}
 
 async function InitWebGPU() {
   const adapter: GPUAdapter | null = await navigator.gpu.requestAdapter();
@@ -64,16 +88,45 @@ async function InitWebGPU() {
   }
 
   const canvas = document.getElementById("canvas")! as HTMLCanvasElement;
-  const renderer = new Renderer(adapter, canvas);
-  await renderer.init();
+  let format = navigator.gpu.getPreferredCanvasFormat();
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+  let pointer_pos: number[] | null = null;
+  let pointer_last: number[] | null = null;
+  let dragging = false;
+
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    pointer_pos = [e.clientX, e.clientY];
+    dragging = true;
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    pointer_pos = [e.clientX, e.clientY];
+  });
+  canvas.addEventListener("pointerup", () => {
+    dragging = false;
+    pointer_last = null;
+  });
+  canvas.addEventListener("pointercancel", () => {
+    dragging = false;
+    pointer_last = null;
+  });
+
+
+  let device = await adapter.requestDevice();
+  let context = configureContext(canvas, device, format);
+  let vertexBuffer = device.createBuffer({
+    label: "models-vertex-buffer",
+    size: 128 * 6 * 4, // 128 vertex buffer
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  });
 
 
 //#region UNIFORM
-  /*
-    const UNIFORM_SIZE: number = 16 * 4; // one mat4x4<f32>: mvp
+    const UNIFORM_SIZE: number = 76 * 4;
     device.pushErrorScope('validation');
     let uniformBuffer: GPUBuffer = device.createBuffer({
-      label: "transform-uniform",
+      label: "uniform",
       size: UNIFORM_SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
@@ -98,20 +151,11 @@ async function InitWebGPU() {
       }]
     });
     device.popErrorScope().then(e => e && console.error('bindgroup error:', e.message));
-  */
 //endregion
 
 //#region CUBE
-  /*
-  const vertexBuffer = device.createBuffer({
-    label: "triangle-vertices",
-    size: CUBE_VERTICES.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-  })
-  device.queue.writeBuffer(vertexBuffer, 0, CUBE_VERTICES);
-
   device.pushErrorScope('validation');
-  const shaderModule = createShaderModule(device, shaderCode, "cube");
+  const shaderModule = createShaderModule(device, shaderCode, "shaders");
   device.popErrorScope().then(e => e && console.error('shader module error:', e.message));
 
   device.pushErrorScope('validation');
@@ -149,72 +193,108 @@ async function InitWebGPU() {
     }
   });
   device.popErrorScope().then(e => e && console.error('cube pipeline error:', e.message));
-  */
 //#endregion
-
-
-  /*
-    const axisBuffer = device.createBuffer({
-      label: "axis-vertices",
-      size: AXIS_VERTICES.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-    })
-    device.queue.writeBuffer(axisBuffer, 0, AXIS_VERTICES);
-
-    const axisPipeline = device.createRenderPipeline({
-      label: "axis-pipeline",
-      layout: device.createPipelineLayout({
-        bindGroupLayouts: [bindGroupLayout]
-      }),
-      vertex: {
-        module: shaderModule,
-        entryPoint: "vertexAxis",
-        buffers: [
-          {
-            arrayStride: 6 * 4, // Float32 per vertex * bytes per float32
-            attributes: [
-              {shaderLocation: 0, offset: 0, format: "float32x3"},
-              {shaderLocation: 1, offset: 3 * 4, format: "float32x3"}
-            ]
-          }
-        ]
-      },
-      fragment: {
-        module: shaderModule,
-        entryPoint: "fragmentMain",
-        targets: [{format: format}]
-      },
-      primitive: {
-        topology: "line-list"
-      },
-      depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: 'less',
-        format: 'depth24plus'
-      }
-    });
-    device.popErrorScope().then(e => e && console.error('axis pipeline error:', e.message));
-    */
-
-
 
   addEventListener("tick", (e: Event) => {
     const tickEvent = e as CustomEvent<RenderTick>;
     tick(tickEvent.detail);
   })
 
+  let depthTexture: GPUTexture | null = null;
   function renderFrame() {
+    // Tick
+    const deltaTime = getDeltaTime();
+    let drag_movement = [0.0, 0.0];
+    let tickData: RenderTick = {deltaTime: deltaTime, drag_movement: [0.0, 0.0]};
+    if (dragging && pointer_pos)
+    {
+      if (pointer_last)
+      {
+        tickData.drag_movement = [
+          pointer_pos[0]! - pointer_last[0]!,
+          pointer_pos[1]! - pointer_last[1]!];
+      }
+      pointer_last = pointer_pos;
+    }
+    tick(tickData);
 
+    // Depth Texture
+    const canvasTexture = context.getCurrentTexture();
+    if (depthTexture && (depthTexture.width !== canvasTexture.width || depthTexture.height !== canvasTexture.height))
+      depthTexture.destroy();
+    if (!depthTexture) {
+      device.pushErrorScope('validation');
+      depthTexture = device.createTexture({
+        size: [canvasTexture.width, canvasTexture.height],
+        format: "depth24plus",
+        usage: GPUTextureUsage.RENDER_ATTACHMENT
+      });
+      device.popErrorScope().then(e => e && console.error('depth texture error:', e.message));
+    }
 
-    // Model
+    const commandEncoder = device.createCommandEncoder({
+      label: 'frame-encoder',
+    })
+
+    const passEncoder = commandEncoder.beginRenderPass({
+      colorAttachments: [{
+        view: canvasTexture.createView(),
+        clearValue: { r: 0.05, g: 0.05, b: 0.05, a: 1.0 },
+        loadOp: "clear",
+        storeOp: "store"
+      }],
+      depthStencilAttachment: {
+        view: depthTexture.createView(),
+        depthClearValue: 1.0,
+        depthLoadOp: "clear",
+        depthStoreOp: "store"
+      }
+    })
+
+    // Uniform
     const modelMatrix = Mat4.identity();
+    device.queue.writeBuffer(uniformBuffer, 0, Mat4.transpose(modelMatrix));
 
-    // Projection
+    const viewMatrix = camera.getViewMatrix();
+    device.queue.writeBuffer(uniformBuffer, 4, Mat4.transpose(viewMatrix));
+
+    // Uniform - Projection Matrix
     const a = canvas.clientWidth/canvas.clientHeight;
     const projectionMatrix = perspective(camera.verticalFov, a, camera.clipNear, camera.clipFar);
-    const mvp = Mat4.multiplyAll([modelMatrix, camera.getViewMatrix(), projectionMatrix]);
+    device.queue.writeBuffer(uniformBuffer, 8, Mat4.transpose(projectionMatrix));
 
-    renderer.renderFrame();
+    const normalMatrix = Mat4.invert(modelMatrix);
+    device.queue.writeBuffer(uniformBuffer, 12, normalMatrix); // Needs to be transposed, so DON'T transpose it
+
+    device.queue.writeBuffer(uniformBuffer, 15, camera.getPosition());
+    device.queue.writeBuffer(uniformBuffer, 16, new Float32Array([params.ambientStrength]));
+    device.queue.writeBuffer(uniformBuffer, 17, new Float32Array(
+      [params.lightPosition.x, params.lightPosition.y, params.lightPosition.z, params.lightStrength]
+    ));
+    device.queue.writeBuffer(uniformBuffer, 20, new Float32Array(
+      [params.diffuse.r, params.diffuse.g, params.diffuse.b]
+    ));
+    device.queue.writeBuffer(uniformBuffer, 21, new Float32Array([params.exponent]));
+
+    passEncoder.setPipeline(pipeline);
+    passEncoder.setVertexBuffer(0, vertexBuffer);
+    passEncoder.setBindGroup(0, bindGroup);
+
+    // Batch draw verts in 128 segments
+    for (let i = 0; i < tetrahedronModel.length; i += 128) {
+      let offsetEnd = Math.min(i + 128, tetrahedronModel.length);
+      const verts = tetrahedronModel.slice(i, offsetEnd);
+
+      device.queue.writeBuffer(vertexBuffer, 0, verts);
+
+      let numVerts = offsetEnd - i;
+      passEncoder.draw(numVerts);
+    }
+
+    passEncoder.end();
+    device.pushErrorScope('validation');
+    device.queue.submit([commandEncoder.finish()])
+    device.popErrorScope().then(e => e && console.error('Error on queue submission: ', e.message));
     requestAnimationFrame(renderFrame);
   }
   requestAnimationFrame(renderFrame);

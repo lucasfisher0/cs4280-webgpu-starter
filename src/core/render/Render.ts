@@ -3,11 +3,8 @@ import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
 import {Model} from "@/core/render/Model";
 import {createShaderModule} from "@/lib/webgpu/shaders";
 
-// export DEFAULT_SHADER = createShaderModule(device, shaderCode, "cube");
-
 type MaterialGroup = [id: string, shader: string, buffer: GPUBuffer, bindGroup: GPUBindGroup];
 type PointerMovement = [x: number, y: number];
-
 
 let currTime: number | null = null;
 function getDeltaTime(): number {
