@@ -37,40 +37,59 @@ function midpoint(A: vec3, B: vec3): vec3 {
  * @param _vertices
  */
 export function makeTetrahedron(_vertices: vec3[] = VERTS_TETRAHEDRON): vec3[] {
-  // Faces: 012 023 321 310
-  // Normal format: normalize( (v1-v0) x (v2-v0))
+  // Faces: 012 031 023 123
   return [
-    _vertices[0]!, _vertices[1]!, _vertices[2]!, normalizeVec3(crossVec3(subVec3(_vertices[1]!, _vertices[0]!), subVec3(_vertices[2]!, _vertices[0]!))),
-    _vertices[0]!, _vertices[2]!, _vertices[3]!, normalizeVec3(crossVec3(subVec3(_vertices[2]!, _vertices[0]!), subVec3(_vertices[3]!, _vertices[0]!))),
-    _vertices[3]!, _vertices[2]!, _vertices[1]!, normalizeVec3(crossVec3(subVec3(_vertices[2]!, _vertices[3]!), subVec3(_vertices[1]!, _vertices[3]!))),
-    _vertices[3]!, _vertices[1]!, _vertices[0]!, normalizeVec3(crossVec3(subVec3(_vertices[1]!, _vertices[3]!), subVec3(_vertices[0]!, _vertices[3]!))),
+    ...makeFace([_vertices[0]!, _vertices[1]!, _vertices[2]!]),
+    ...makeFace([_vertices[0]!, _vertices[3]!, _vertices[1]!]),
+    ...makeFace([_vertices[0]!, _vertices[2]!, _vertices[3]!]),
+    ...makeFace([_vertices[1]!, _vertices[3]!, _vertices[2]!]),
   ];
 }
 
-export function subdivideTetrahedron(_vertices: vec3[] = VERTS_TETRAHEDRON, depth: number = 0) : vec3[] {
+function makeFace(_vertices: vec3[]) {
+  const n: vec3 = normalizeVec3(crossVec3(
+    subVec3(_vertices[1]!, _vertices[0]!),
+    subVec3(_vertices[2]!, _vertices[0]!)))
+
+  const [a, b, c] = _vertices as [vec3, vec3, vec3];
+  return [
+    a, n,
+    b, n,
+    c, n,
+  ];
+}
+
+function subdivideTetrahedron(_vertices: vec3[], depth: number = 0) : vec3[] {
   if (depth <= 0)
     return _vertices;
 
-  //return _vertices;
+  const [v0, v1, v2, v3] = _vertices;
+  const m01 = midpoint(v0!, v1!);
+  const m02 = midpoint(v0!, v2!);
+  const m03 = midpoint(v0!, v3!);
+  const m12 = midpoint(v1!, v2!);
+  const m13 = midpoint(v1!, v3!);
+  const m23 = midpoint(v2!, v3!);
 
-  // function midpoint(A: vec3, B: vec3): vec3[]
-  const midpoints = [
-    midpoint(_vertices[0]!, _vertices[1]!),
-    midpoint(_vertices[0]!, _vertices[2]!),
-    midpoint(_vertices[0]!, _vertices[3]!),
-    midpoint(_vertices[1]!, _vertices[2]!),
-    midpoint(_vertices[1]!, _vertices[3]!),
-    midpoint(_vertices[2]!, _vertices[3]!),
+  return [
+    ...subdivideTetrahedron([v0!, m01, m02, m03], depth - 1),
+    ...subdivideTetrahedron([v1!, m01, m12, m13], depth - 1),
+    ...subdivideTetrahedron([v2!, m02, m12, m23], depth - 1),
+    ...subdivideTetrahedron([v3!, m03, m13, m23], depth - 1),
   ];
+}
+
+export function generateGasket(depth: number = 0) : vec3[] {
+  if (depth <= 0)
+    return makeTetrahedron();
 
   let vertices: vec3[] = [];
-  // 012
-  vertices.push(...subdivideTetrahedron(makeTetrahedron([_vertices[0]!, midpoints[0]!, midpoints[1]!]), depth-1));
-  // 023
-  vertices.push(...subdivideTetrahedron(makeTetrahedron([_vertices[0]!, midpoints[1]!, midpoints[2]!]), depth-1));
-  // 321
-  vertices.push(...subdivideTetrahedron(makeTetrahedron([_vertices[3]!, midpoints[5]!, midpoints[4]!]), depth-1));
-  // 310
-  vertices.push(...subdivideTetrahedron(makeTetrahedron([_vertices[3]!, midpoints[4]!, midpoints[2]!]), depth-1));
+
+  let boxes = subdivideTetrahedron(VERTS_TETRAHEDRON, depth);
+  for (let i = 0; i < boxes.length / 4; i++) {
+    const _verts = boxes.slice(i*4, (i*4)+4) as vec3[];
+    vertices.push(...makeTetrahedron(_verts));
+  }
+
   return vertices;
 }

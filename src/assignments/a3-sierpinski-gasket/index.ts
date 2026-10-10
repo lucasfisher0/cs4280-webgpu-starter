@@ -18,11 +18,14 @@ import {Renderer} from "@/core/render/Render";
 import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
 DEFAULT_MATERIAL.shader = ["DEFAULT", shaderCode];
 
-import {makeTetrahedron, subdivideTetrahedron, VERTS_TETRAHEDRON} from "@/assignments/a3-sierpinski-gasket/tetrahedron";
+import {
+  generateGasket,
+} from "@/assignments/a3-sierpinski-gasket/tetrahedron";
 import {Model} from "@/core/render/Model";
 import {configureContext} from "@/lib/webgpu/context";
 
 type PointerMovement = [x: number, y: number];
+type vec3 = [number, number, number];
 
 function deg2rad(deg: number) {
   return deg * Math.PI / 180;
@@ -40,18 +43,18 @@ const gui = new GUI( { container: document.getElementById( 'controlBox' )! } );
 const params = {
   cameraDistance: 5,
   cameraSpin: true,
-  depth: 3,
+  depth: 0,
   diffuse: {r: 1, g: 0, b: 1},
-  lightPosition: {x: 0, y: 0, z: 0},
-  lightStrength: 5,
-  ambientStrength: 2,
+  lightPosition: {x: 5, y: 5, z: 5},
+  lightStrength: 1,
+  ambientStrength: 0.2,
   specularCoefficient: 10,
-  exponent: 10,
+  exponent: 1000,
 };
 
 const folderModel = gui.addFolder("Model");
 const diffuseControl = folderModel.addColor(params, "diffuse").name("Diffuse Color");
-const depthControl = folderModel.add(params, "depth").name("Recursion Depth");
+const depthControl = folderModel.add(params, "depth", 0, 5, 1).name("Recursion Depth").onChange(() => onDepthUpdated());
 const specularControl = folderModel.add(params, "specularCoefficient").name("Specular Coefficient");
 const exponentControl = folderModel.add(params, "exponent").name("Exponent");
 
@@ -62,7 +65,7 @@ folderCamera.add(params, "cameraSpin").name("Spin");
 
 const folderLight = gui.addFolder( "Light Position" );
 for (const key in params.lightPosition) {
-  const elem = folderLight.add(params.lightPosition, key as keyof typeof params.lightPosition, -1, 1)
+  const elem = folderLight.add(params.lightPosition, key as keyof typeof params.lightPosition, -5, 5)
     .name(key.toUpperCase())
     .domElement!.parentElement!;
 
@@ -70,16 +73,17 @@ for (const key in params.lightPosition) {
   elem.style = "width: 33.33%;";
 }
 const lightStrengthControl = gui.add(params, "lightStrength").name("Light Strength");
-const AmbientStrengthControl = gui.add(params, "ambientStrength").name("Ambient Strength");
+const AmbientStrengthControl = gui.add(params, "ambientStrength", 0.0, 1, 0.05).name("Ambient Strength");
 //#endregion
 
 const camera = new Camera();
 
-let tetrahedronModel: Float32Array = onDepthUpdated();
+let tetrahedronModel: Float32Array = new Float32Array([]);
 function onDepthUpdated(): Float32Array {
-  tetrahedronModel = new Float32Array(subdivideTetrahedron(VERTS_TETRAHEDRON, params.depth).flat(2));
+  tetrahedronModel = new Float32Array(generateGasket(params.depth).flat());
   return tetrahedronModel;
 }
+onDepthUpdated();
 
 async function InitWebGPU() {
   const adapter: GPUAdapter | null = await navigator.gpu.requestAdapter();
@@ -99,6 +103,7 @@ async function InitWebGPU() {
     canvas.setPointerCapture(e.pointerId);
     pointer_pos = [e.clientX, e.clientY];
     dragging = true;
+    console.log("Dragging Started")
   });
   canvas.addEventListener("pointermove", (e) => {
     pointer_pos = [e.clientX, e.clientY];
@@ -115,9 +120,11 @@ async function InitWebGPU() {
 
   let device = await adapter.requestDevice();
   let context = configureContext(canvas, device, format);
+
+  const VERTEX_BATCH_SIZE = 128;
   let vertexBuffer = device.createBuffer({
     label: "models-vertex-buffer",
-    size: 128 * 6 * 4, // 128 vertex buffer
+    size: VERTEX_BATCH_SIZE * 6 * 4, // 128 vertex buffer
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   });
 
@@ -136,7 +143,7 @@ async function InitWebGPU() {
       label: "u-layout",
       entries: [{
         binding: 0,
-        visibility: GPUShaderStage.VERTEX,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: {type: "uniform"}
       }]
     });
@@ -256,39 +263,36 @@ async function InitWebGPU() {
     device.queue.writeBuffer(uniformBuffer, 0, Mat4.transpose(modelMatrix));
 
     const viewMatrix = camera.getViewMatrix();
-    device.queue.writeBuffer(uniformBuffer, 4, Mat4.transpose(viewMatrix));
+    device.queue.writeBuffer(uniformBuffer, 64, Mat4.transpose(viewMatrix));
 
     // Uniform - Projection Matrix
     const a = canvas.clientWidth/canvas.clientHeight;
     const projectionMatrix = perspective(camera.verticalFov, a, camera.clipNear, camera.clipFar);
-    device.queue.writeBuffer(uniformBuffer, 8, Mat4.transpose(projectionMatrix));
+    device.queue.writeBuffer(uniformBuffer, 128, Mat4.transpose(projectionMatrix));
 
     const normalMatrix = Mat4.invert(modelMatrix);
-    device.queue.writeBuffer(uniformBuffer, 12, normalMatrix); // Needs to be transposed, so DON'T transpose it
+    device.queue.writeBuffer(uniformBuffer, 192, normalMatrix); // Needs to be transposed, so DON'T transpose it
 
-    device.queue.writeBuffer(uniformBuffer, 15, camera.getPosition());
-    device.queue.writeBuffer(uniformBuffer, 16, new Float32Array([params.ambientStrength]));
-    device.queue.writeBuffer(uniformBuffer, 17, new Float32Array(
+    const camPosition = camera.getPosition()
+    device.queue.writeBuffer(uniformBuffer, 256, new Float32Array([...camPosition, params.ambientStrength]));
+    device.queue.writeBuffer(uniformBuffer, 272, new Float32Array(
       [params.lightPosition.x, params.lightPosition.y, params.lightPosition.z, params.lightStrength]
     ));
-    device.queue.writeBuffer(uniformBuffer, 20, new Float32Array(
-      [params.diffuse.r, params.diffuse.g, params.diffuse.b]
+    device.queue.writeBuffer(uniformBuffer, 288, new Float32Array(
+      [params.diffuse.r, params.diffuse.g, params.diffuse.b, params.exponent]
     ));
-    device.queue.writeBuffer(uniformBuffer, 21, new Float32Array([params.exponent]));
 
     passEncoder.setPipeline(pipeline);
     passEncoder.setVertexBuffer(0, vertexBuffer);
     passEncoder.setBindGroup(0, bindGroup);
 
-    // Batch draw verts in 128 segments
-    for (let i = 0; i < tetrahedronModel.length; i += 128) {
-      let offsetEnd = Math.min(i + 128, tetrahedronModel.length);
-      const verts = tetrahedronModel.slice(i, offsetEnd);
+    // Variable vertex batching
+    for (let i = 0; i < tetrahedronModel.length; i += VERTEX_BATCH_SIZE * 6) {
+      const end = Math.min(i + VERTEX_BATCH_SIZE * 6, tetrahedronModel.length);
+      const verts = tetrahedronModel.subarray(i, end);
 
       device.queue.writeBuffer(vertexBuffer, 0, verts);
-
-      let numVerts = offsetEnd - i;
-      passEncoder.draw(numVerts);
+      passEncoder.draw(verts.length / 6);
     }
 
     passEncoder.end();
@@ -300,9 +304,13 @@ async function InitWebGPU() {
   requestAnimationFrame(renderFrame);
 }
 
+const CAM_SENS = 5.0;
 function tick(data: RenderTick) {
   camera.tetherDistance = params.cameraDistance;
   camera.spinSpeed = Number(params.cameraSpin) * 0.2;
+  camera.addRotation(
+    data.deltaTime * data.drag_movement[0] * CAM_SENS,
+    data.deltaTime * data.drag_movement[1] * CAM_SENS);
   camera.tick(data);
 }
 

@@ -35,12 +35,12 @@ fn vertexMain(@location(0) position: vec3<f32>, @location(1) normal: vec3<f32>) 
 
 @fragment
 fn fragmentMain(in: VertexOutput) -> @location(0) vec4<f32> {
-    let ambient: vec3<f32> = vec3<f32>(1.0, 1.0, 1.0) * uniforms.ambientStrength;
+    let ambient: vec3<f32> = vec3<f32>(1.0, 1.0, 1.0) * uniforms.ambientStrength * uniforms.diffuse;
 
     // Diffuse
     let norm = normalize(in.normal);
     let lightDir = normalize(uniforms.lightPosition.xyz - in.worldPosition);
-    let diffuse = max(dot(norm, lightDir), 0.0);
+    let diffuse = max(dot(norm, lightDir), 0.0) * uniforms.diffuse;
 
     // Specular
     let viewDir = normalize(uniforms.cameraPosition - in.worldPosition);
@@ -49,6 +49,6 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4<f32> {
     let spec = pow(angle, uniforms.exponent);
     let specular = spec * (vec3<f32>(1.0, 1.0, 1.0) * uniforms.lightPosition.a);
 
-    let color = (ambient + diffuse + specular) * uniforms.diffuse;
+    let color = ambient + diffuse + specular;
     return vec4<f32>(color, 1.0);
 }
