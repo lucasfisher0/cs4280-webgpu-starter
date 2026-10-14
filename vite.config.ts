@@ -28,6 +28,10 @@ export default defineConfig({
   root: "src",
   publicDir: "../public",
   plugins: [],
+  define: {
+    // __APP_VERSION__: JSON.stringify('1.0.0'),
+    __ENABLE_SCENE_EDITOR__: true,
+  },
   resolve: {
     tsconfigPaths: true,
     alias: {

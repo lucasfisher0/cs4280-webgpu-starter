@@ -18,3 +18,6 @@ declare module '*.wgsl?raw' {
   const value: string;
   export default value;
 }
+
+//declare const __APP_VERSION__: string
+declare const __ENABLE_SCENE_EDITOR__: boolean
