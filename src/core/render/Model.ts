@@ -1,6 +1,6 @@
 
 import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
-import {Entity} from "@/core/scenegraph/Entity";
+import {SceneNode} from "@/core/scenegraph/SceneNode";
 
 const UNIFORM_SIZE: number = 16 * 4; // one mat4x4<f32>: mvp
 const uniformGroupLayout: GPUBindGroupLayoutDescriptor = {
@@ -12,13 +12,13 @@ const uniformGroupLayout: GPUBindGroupLayoutDescriptor = {
   }]
 };
 
-export class Model extends Entity {
+export class ModelNode extends SceneNode {
   vertices: Float32Array;
   material: Material;
 
   constructor(vertices: Float32Array,
               material?: Material | null,
-              ...args: ConstructorParameters<typeof Entity>) {
+              ...args: ConstructorParameters<typeof SceneNode>) {
     super(...args);
     this.vertices = vertices;
     this.material = material ?? DEFAULT_MATERIAL; // Set on constructor, not initialized to allow for DEFAULT_MATERIAL to be setup

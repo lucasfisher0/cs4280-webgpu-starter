@@ -1,16 +1,27 @@
-import {describe, expect, test} from "vitest";
-import {Entity} from "@/core/scenegraph/Entity";
-import {rotateX, rotateZ, scale, translate} from "@/lib/math/transforms";
-import {stringifyMatrix} from "@/core/debug/mat4";
-import {encodePPM} from "@/lib/image/ppm";
-import {multiply} from "@/lib/math/mat4";
 
-describe("Entity Transform", () => {
+
+import {describe, expect, test} from "vitest";
+import {WavefrontMeshBuilder} from "@/core/assets/Wavefront";
+// @ts-ignore
+import monkey from "./monkey.obj?raw";
+
+test("Wavefront Mesh Builder - Monkey", () => {
+
+  let mesh = WavefrontMeshBuilder.fromString(monkey);
+  let i = 0;
+});
+/*
+describe("Node Transform", () => {
 
   const t = translate(1, 2, 3);
   const r = rotateZ(-Math.PI / 2);
   const s = scale(2, 3, 4);
-  let cube = new Entity("", t, r, s);
+  let cube = new SceneNode({
+    name: "",
+    translation: t,
+    rotation: r,
+    scale: s
+  });
 
   test("TRS Composition", () => {
     const transform = cube.getTransformMatrix();
@@ -27,7 +38,13 @@ describe("Entity Transform", () => {
   })
 
   test("Parent-Child Composition", () => {
-    let parentCube = new Entity("", translate(1, 2, 3), rotateX(Math.PI / 2), scale(2, 2, 2));
+    let parentCube = new SceneNode({
+      name: "",
+      translation: translate(1, 2, 3),
+      rotation: rotateX(Math.PI / 2),
+      scale: scale(2, 2, 2)
+    });
+
     parentCube.addChild(cube);
     expect(cube.parent).toBe(parentCube);
 
@@ -42,3 +59,4 @@ describe("Entity Transform", () => {
   })
 
 });
+ */

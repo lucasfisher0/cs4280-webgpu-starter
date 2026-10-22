@@ -1,6 +1,6 @@
 import {lookAt} from "@/lib/math/transforms.js";
 import {type RenderTick, renderTickEvent} from "@/core/render/Render"
-import {Entity} from "@/core/scenegraph/Entity";
+import {SceneNode} from "@/core/scenegraph/SceneNode";
 
 // TODO: inherit from Entity
 /**

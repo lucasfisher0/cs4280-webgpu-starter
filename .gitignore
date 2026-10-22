@@ -7,6 +7,7 @@ dist-ssr/
 
 # Test coverage
 coverage/
+src/node_modules/
 .vitest/
 
 # Logs
