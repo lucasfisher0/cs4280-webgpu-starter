@@ -230,6 +230,7 @@ async function InitWebGPU() {
   })
   device.queue.writeBuffer(axisBuffer, 0, AXIS_VERTICES);
 
+  device.pushErrorScope('validation');
   const axisPipeline = device.createRenderPipeline({
     label: "axis-pipeline",
     layout: device.createPipelineLayout({
@@ -299,7 +300,7 @@ async function InitWebGPU() {
     // Projection
     const a = canvas.clientWidth/canvas.clientHeight;
     const projectionMatrix = perspective(camera.verticalFov, a, camera.clipNear, camera.clipFar);
-    const mvp = multiplyAll([modelMatrix, camera.getViewMatrix(), projectionMatrix]);
+    const mvp = multiplyAll([projectionMatrix, camera.getViewMatrix(), modelMatrix]);
 
     const canvasTexture = context.getCurrentTexture();
     if (depthTexture && (depthTexture.width !== canvasTexture.width || depthTexture.height !== canvasTexture.height)) {
@@ -335,7 +336,7 @@ async function InitWebGPU() {
       }
     })
 
-    device.queue.writeBuffer(uniformBuffer, 0, transpose(mvp));
+    device.queue.writeBuffer(uniformBuffer, 0, mvp);
     passEncoder.setPipeline(pipeline);
     passEncoder.setVertexBuffer(0, vertexBuffer);
     passEncoder.setBindGroup(0, bindGroup);

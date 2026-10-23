@@ -31,12 +31,13 @@ export class SceneNode {
   }
 
   /**
-   * TODO: recompute `worldTransform` for this node (compose
-   * `parentWorldTransform` with `this.localTransform` — see `mat4.js`'s
-   * `multiply`) and then every descendant, in one top-down recursive pass.
+   * Updates the world transforms for this node and all descendants.
    */
   updateWorldTransforms(_parentWorldTransform = mat4.identity()) {
-    throw new Error("SceneNode.updateWorldTransforms: not implemented");
+    this.worldTransform = mat4.multiply(this.localTransform, _parentWorldTransform);
+    for (const child of this.children) {
+      child.updateWorldTransforms(this.worldTransform);
+    }
   }
 
   /**

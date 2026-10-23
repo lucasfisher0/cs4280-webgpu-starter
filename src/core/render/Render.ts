@@ -1,6 +1,6 @@
 import {configureContext} from "@/lib/webgpu/context";
 import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
-import {Model} from "@/core/render/Model";
+// import {Model} from "@/core/render/Model";
 import {createShaderModule} from "@/lib/webgpu/shaders";
 
 type MaterialGroup = [id: string, shader: string, buffer: GPUBuffer, bindGroup: GPUBindGroup];
@@ -25,6 +25,7 @@ export const renderTickEvent = new CustomEvent<RenderTick>("tick", {
   bubbles: true
 });
 
+/*
 export class Renderer {
   // WebGPU
   adapter: GPUAdapter;
@@ -147,10 +148,7 @@ export class Renderer {
   }
 
   recheckShaders() {
-    /*for(const mat of this.matBuffers.values())
-    {
-
-    }*/
+    //for(const mat of this.matBuffers.values()) { }
   }
 
   depthTexture: GPUTexture | null = null;
@@ -194,25 +192,21 @@ export class Renderer {
       }
     })
 
-    /*
-    this.device.queue.writeBuffer(uniformBuffer, 0, transpose(mvp));
-    passEncoder.setPipeline(pipeline);
-    passEncoder.setVertexBuffer(0, vertexBuffer);
-    passEncoder.setBindGroup(0, bindGroup);
-    passEncoder.draw(36); // 6 faces x 2 triangles x 3 vertices
 
-    passEncoder.setPipeline(axisPipeline);
-    passEncoder.setVertexBuffer(0, axisBuffer);
-    passEncoder.setBindGroup(0, bindGroup);
-    passEncoder.draw(6);
-    */
+    // this.device.queue.writeBuffer(uniformBuffer, 0, transpose(mvp));
+    // passEncoder.setPipeline(pipeline);
+    // passEncoder.setVertexBuffer(0, vertexBuffer);
+    // passEncoder.setBindGroup(0, bindGroup);
+    // passEncoder.draw(36); // 6 faces x 2 triangles x 3 vertices
+    // passEncoder.setPipeline(axisPipeline);
+    // passEncoder.setVertexBuffer(0, axisBuffer);
+    // passEncoder.setBindGroup(0, bindGroup);
+    // passEncoder.draw(6);
 
     passEncoder.end();
     this.device.pushErrorScope('validation');
     this.device.queue.submit([commandEncoder.finish()])
     this.device.popErrorScope().then(e => e && console.error('Error on queue submission: ', e.message));
   }
-
-
-
 }
+*/

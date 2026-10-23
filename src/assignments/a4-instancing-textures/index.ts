@@ -14,14 +14,16 @@ import {
   translate as matrixTranslate
 } from "@/lib/math/transforms";
 
+/*
 import {Renderer} from "@/core/render/Render";
 import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
 DEFAULT_MATERIAL.shader = ["DEFAULT", shaderCode];
+*/
 
 import {
   generateGasket,
 } from "@/assignments/a3-sierpinski-gasket/tetrahedron";
-import {Model} from "@/core/render/Model";
+// import {Model} from "@/core/render/Model";
 import {configureContext} from "@/lib/webgpu/context";
 
 type PointerMovement = [x: number, y: number];

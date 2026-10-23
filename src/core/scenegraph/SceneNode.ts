@@ -1,13 +1,13 @@
-import * as Transforms from "@/lib/math/transforms.js"
-import * as Mat4 from "@/lib/math/mat4.js"
+import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math"
+import * as JSSceneNode from "@/lib/scenegraph/SceneNode.js"
 
 let nodeCount: number = 0;
 
 interface SceneNodeDescriptor {
   name: string;
-  translation?: Float32Array<ArrayBuffer> | null;
-  rotation?: Float32Array<ArrayBuffer> | null;
-  scale?: Float32Array<ArrayBuffer> | null;
+  translation?: Mat4 | null;
+  rotation?: Mat4 | null;
+  scale?: Mat4 | null;
   mesh?: undefined | null;
   data?: undefined | null;
 }
@@ -19,17 +19,17 @@ export type { SceneNodeDescriptor };
 export class SceneNode {
   readonly guid: string = crypto.randomUUID();
   name: string;
-  translation: Float32Array;
-  rotation: Float32Array;
-  scale: Float32Array;
+  translation: Mat4;
+  rotation: Mat4;
+  scale: Mat4;
   children: SceneNode[] = [];
   parent: SceneNode | null = null;
 
   constructor(desc: SceneNodeDescriptor) {
     this.name = desc.name ?? `node_${nodeCount}`;
-    this.translation = desc.translation ?? Transforms.translate(0, 0, 0);
+    this.translation = desc.translation ?? Transform.translate(0, 0, 0);
     this.rotation = desc.rotation ?? Mat4.identity();
-    this.scale = desc.scale ?? Transforms.scale(1, 1, 1);
+    this.scale = desc.scale ?? Transform.scale(1, 1, 1);
     nodeCount++;
   }
 
@@ -54,7 +54,7 @@ export class SceneNode {
   }
 
   /** Applies all parent transformations. **/
-  getWorldTransform(): Float32Array {
+  getWorldTransform(): Mat4 {
     if (this.parent)
       return Mat4.multiply(this.parent.getTransformMatrix(), this.getTransformMatrix());
 
@@ -62,7 +62,7 @@ export class SceneNode {
   }
 
   /** Returns composed TRS matrix in local-space. **/
-  getTransformMatrix(): Float32Array {
+  getTransformMatrix(): Mat4 {
     return Mat4.multiplyAll([this.translation, this.rotation, this.scale]);
   }
 }

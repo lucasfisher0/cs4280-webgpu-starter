@@ -14,14 +14,9 @@ import {
   translate as matrixTranslate
 } from "@/lib/math/transforms";
 
-import {Renderer} from "@/core/render/Render";
-import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
-DEFAULT_MATERIAL.shader = ["DEFAULT", shaderCode];
-
 import {
   generateGasket,
 } from "@/assignments/a3-sierpinski-gasket/tetrahedron";
-import {Model} from "@/core/render/Model";
 import {configureContext} from "@/lib/webgpu/context";
 
 type PointerMovement = [x: number, y: number];
@@ -32,6 +27,7 @@ function deg2rad(deg: number) {
 }
 
 let currTime: number | null = null;
+
 function getDeltaTime(): number {
   const oldTime = currTime;
   currTime = performance.now();
@@ -39,7 +35,7 @@ function getDeltaTime(): number {
 }
 
 //#region GUI
-const gui = new GUI( { container: document.getElementById( 'controlBox' )! } );
+const gui = new GUI({container: document.getElementById('controlBox')!});
 const params = {
   cameraDistance: 5,
   cameraSpin: true,
@@ -64,7 +60,7 @@ const folderCamera = gui.addFolder("Camera");
 const distanceControl = folderCamera.add(params, "cameraDistance", 2, 12, 0.1).name("Distance");
 folderCamera.add(params, "cameraSpin").name("Spin");
 
-const folderLight = gui.addFolder( "Light Position" );
+const folderLight = gui.addFolder("Light Position");
 for (const key in params.lightPosition) {
   const elem = folderLight.add(params.lightPosition, key as keyof typeof params.lightPosition, -5, 5)
     .name(key.toUpperCase())
@@ -80,10 +76,12 @@ const AmbientStrengthControl = gui.add(params, "ambientStrength", 0.0, 1, 0.05).
 const camera = new Camera();
 
 let tetrahedronModel: Float32Array = new Float32Array([]);
+
 function onDepthUpdated(): Float32Array {
   tetrahedronModel = new Float32Array(generateGasket(params.depth).flat());
   return tetrahedronModel;
 }
+
 onDepthUpdated();
 
 async function InitWebGPU() {
@@ -131,34 +129,34 @@ async function InitWebGPU() {
 
 
 //#region UNIFORM
-    const UNIFORM_SIZE: number = 84 * 4;
-    device.pushErrorScope('validation');
-    let uniformBuffer: GPUBuffer = device.createBuffer({
-      label: "uniform",
-      size: UNIFORM_SIZE,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-    device.popErrorScope().then(e => e && console.error('uniform buffer error:', e.message));
+  const UNIFORM_SIZE: number = 84 * 4;
+  device.pushErrorScope('validation');
+  let uniformBuffer: GPUBuffer = device.createBuffer({
+    label: "uniform",
+    size: UNIFORM_SIZE,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  device.popErrorScope().then(e => e && console.error('uniform buffer error:', e.message));
 
-    const bindGroupLayout: GPUBindGroupLayout = device.createBindGroupLayout({
-      label: "u-layout",
-      entries: [{
-        binding: 0,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: {type: "uniform"}
-      }]
-    });
+  const bindGroupLayout: GPUBindGroupLayout = device.createBindGroupLayout({
+    label: "u-layout",
+    entries: [{
+      binding: 0,
+      visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+      buffer: {type: "uniform"}
+    }]
+  });
 
-    device.pushErrorScope('validation');
-    const bindGroup: GPUBindGroup = device.createBindGroup({
-      label: "u-group",
-      layout: bindGroupLayout,
-      entries: [{
-        binding: 0,
-        resource: {buffer: uniformBuffer}
-      }]
-    });
-    device.popErrorScope().then(e => e && console.error('bindgroup error:', e.message));
+  device.pushErrorScope('validation');
+  const bindGroup: GPUBindGroup = device.createBindGroup({
+    label: "u-group",
+    layout: bindGroupLayout,
+    entries: [{
+      binding: 0,
+      resource: {buffer: uniformBuffer}
+    }]
+  });
+  device.popErrorScope().then(e => e && console.error('bindgroup error:', e.message));
 //endregion
 
 //#region CUBE
@@ -209,15 +207,14 @@ async function InitWebGPU() {
   })
 
   let depthTexture: GPUTexture | null = null;
+
   function renderFrame() {
     // Tick
     const deltaTime = getDeltaTime();
     let drag_movement = [0.0, 0.0];
     let tickData: RenderTick = {deltaTime: deltaTime, drag_movement: [0.0, 0.0]};
-    if (dragging && pointer_pos)
-    {
-      if (pointer_last)
-      {
+    if (dragging && pointer_pos) {
+      if (pointer_last) {
         tickData.drag_movement = [
           pointer_pos[0]! - pointer_last[0]!,
           pointer_pos[1]! - pointer_last[1]!];
@@ -247,7 +244,7 @@ async function InitWebGPU() {
     const passEncoder = commandEncoder.beginRenderPass({
       colorAttachments: [{
         view: canvasTexture.createView(),
-        clearValue: { r: 0.05, g: 0.05, b: 0.05, a: 1.0 },
+        clearValue: {r: 0.05, g: 0.05, b: 0.05, a: 1.0},
         loadOp: "clear",
         storeOp: "store"
       }],
@@ -267,7 +264,7 @@ async function InitWebGPU() {
     device.queue.writeBuffer(uniformBuffer, 64, Mat4.transpose(viewMatrix));
 
     // Uniform - Projection Matrix
-    const a = canvas.clientWidth/canvas.clientHeight;
+    const a = canvas.clientWidth / canvas.clientHeight;
     const projectionMatrix = perspective(camera.verticalFov, a, camera.clipNear, camera.clipFar);
     device.queue.writeBuffer(uniformBuffer, 128, Mat4.transpose(projectionMatrix));
 
@@ -302,10 +299,12 @@ async function InitWebGPU() {
     device.popErrorScope().then(e => e && console.error('Error on queue submission: ', e.message));
     requestAnimationFrame(renderFrame);
   }
+
   requestAnimationFrame(renderFrame);
 }
 
 const CAM_SENS = 5.0;
+
 function tick(data: RenderTick) {
   camera.tetherDistance = params.cameraDistance;
   camera.spinSpeed = Number(params.cameraSpin) * 0.2;
