@@ -11,7 +11,9 @@ enum OBJ_TOKEN {
   NORMAL = "vn",
   UV = "vt",
   FACE = "f",
-  SMOOTH_GROUP = "s"
+  SMOOTH_GROUP = "s",
+  MATERIAL_FILE = "mtllib",
+  MATERIAL = "usemtl",
 }
 
 function parseVec2(str: string[]): Vec2 {
