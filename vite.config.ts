@@ -20,6 +20,10 @@ const pages = [
   "activities/pyramid-mvp/index.html",
   "activities/pyramid-shaded/index.html",
   "activities/sphere-shaded/index.html",
+  "activities/snowmen/index.html",
+  "activities/snowmen-shader-pattern/index.html",
+  "activities/snowmen-canvas-texture/index.html",
+  "activities/globe/index.html",
   "activities/sierpinski/index.html",
 ];
 

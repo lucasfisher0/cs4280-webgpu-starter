@@ -5,8 +5,8 @@ import * as mat4 from "@/lib/math/mat4.js";
  * optional payload (a mesh to draw, or `null` for a pure "joint" node that
  * only exists to carry a transform to its children), and child nodes.
  *
- * `updateWorldTransforms()` and `traverse()` below are Assignment 4's
- * actual deliverable — parent-child transform inheritance, recursively
+ * `updateWorldTransforms()` and `traverse()` below are part of Assignment 7's
+ * deliverable — parent-child transform inheritance, recursively
  * traversed and rendered. They throw until you implement them; everything
  * else here (construction, `addChild`, `setLocalTransform`, `find`) is
  * bookkeeping you can use as-is.

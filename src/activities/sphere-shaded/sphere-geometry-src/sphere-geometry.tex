@@ -1,0 +1,164 @@
+\DocumentMetadata{
+  lang=en-US,
+  pdfversion=2.0,
+  pdfstandard=ua-2,
+  tagging=on,
+  testphase={phase-III,math,title,table,tikz}
+}
+\documentclass[11pt]{article}
+\usepackage[letterpaper,margin=0.55in]{geometry}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,patterns,decorations.pathreplacing,calc}
+\usepackage{xcolor}
+\usepackage{multicol}
+\usepackage{enumitem}
+\usepackage{unicode-math}
+\setmonofont{Latin Modern Mono}
+\usepackage{hyperref}
+\hypersetup{
+  pdftitle={How the UV Sphere Is Built},
+  pdfauthor={CS 4280},
+  pdfsubject={CS 4280 sphere-shaded activity: UV sphere geometry},
+  pdfkeywords={UV sphere, spherical coordinates, triangle mesh, normals, WebGPU},
+  pdfdisplaydoctitle=true
+}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3pt}
+\setlength{\columnsep}{18pt}
+\definecolor{thetac}{HTML}{C0392B}
+\definecolor{phic}{HTML}{1F6FB2}
+\definecolor{cellc}{HTML}{E08E0B}
+\definecolor{keep}{HTML}{3A9D5D}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\makeatletter
+\renewcommand\section{\@startsection{section}{1}{0pt}{0pt}{-1em}{\LARGE\bfseries}}
+\renewcommand\subsection{\@startsection{subsection}{2}{0pt}{4pt}{1pt}{\large\bfseries}}
+\makeatother
+\setcounter{secnumdepth}{0}
+\newcommand{\step}[1]{\subsection{#1}}
+
+\newcommand{\figonealt}{Three-dimensional diagram of a sphere of radius r centered at origin O, with the x, y, and z axes drawn; y points up. A point P on the sphere is joined to O by a radius. The angle theta is measured from the positive y axis (the north pole, theta = 0) down to the radius, and the angle phi is measured around the y axis starting from the positive z axis. Dashed helper lines show that P is at height r cos theta and at distance r sin theta from the y axis. Latitude and longitude grid lines cover the sphere, and one grid cell below the equator is shaded orange with corners a and b on its upper edge, c and d on its lower edge, and a diagonal from a to d. The south pole is at theta = pi.}
+\begin{document}
+\section{How the UV Sphere Is Built}\hfill{\small CS 4280 \,·\, \code{sphere-shaded} activity}\par
+\vspace{2pt}\hrule\vspace{8pt}
+
+\noindent
+\begin{minipage}[c]{0.44\textwidth}\centering
+\input{fig1.tex}\par\vspace{2pt}
+{\small\textbf{Figure 1.} Any point $P$ on the sphere is picked by two angles:
+{\color{thetac}$\theta$} (down from the north pole) and {\color{phic}$\varphi$} (around the $y$ axis, starting at $+z$).
+The {\color{cellc!60!black}orange} patch is one grid cell.}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.53\textwidth}\centering
+\begin{tikzpicture}[x=0.78cm,y=0.78cm, font=\scriptsize, alt={Grid diagram of the sphere unwrapped into angle space, drawn with 4 rows and 8 columns of cells. Columns run left to right in phi from 0 to 2 pi (column j = 0 to LON_BANDS); rows run top to bottom in theta, row i = 0 to 4, from the north pole at the top to the south pole at the bottom. Each cell is split by a diagonal into two triangles. In the top row, the triangle touching the north pole edge is hatched as skipped because it has zero area, and the other triangle is drawn. In the bottom row, the triangle touching the south pole edge is hatched as skipped. Both triangles are drawn in the middle rows. The left and right edges are highlighted in blue as the seam, where the columns phi = 0 and phi = 2 pi are the same points. The cell in row 2, column 2 is shaded orange with corners a (top left), b (top right), c (bottom left), and d (bottom right), and curved arrows show that both triangles a, c, d and a, d, b are wound counter-clockwise.}]
+  \def\LAT{4}\def\LON{8}
+  % pole rows: one kept triangle, one skipped triangle
+  \foreach \j in {0,...,7} {
+    % top row (i = 0): a == b, keep (a,c,d), skip (a,d,b)
+    \fill[keep!25] (\j,0) -- (\j,-1) -- (\j+1,-1) -- cycle;
+    \fill[pattern=north east lines, pattern color=gray!60] (\j,0) -- (\j+1,-1) -- (\j+1,0) -- cycle;
+    % bottom row (i = 3): c == d, keep (a,d,b), skip (a,c,d)
+    \fill[keep!25] (\j,-3) -- (\j+1,-4) -- (\j+1,-3) -- cycle;
+    \fill[pattern=north east lines, pattern color=gray!60] (\j,-3) -- (\j,-4) -- (\j+1,-4) -- cycle;
+  }
+  % middle rows: both triangles kept
+  \fill[keep!12] (0,-1) rectangle (8,-3);
+  % highlighted cell i = 2, j = 2
+  \fill[cellc!30] (2,-2) rectangle (3,-3);
+  % grid lines and diagonals
+  \foreach \j in {1,...,7} \draw[gray!70] (\j,0) -- (\j,-4);
+  \foreach \i in {1,...,3} \draw[gray!70] (0,-\i) -- (8,-\i);
+  \foreach \i in {0,...,3} \foreach \j in {0,...,7} \draw[gray!70] (\j,-\i) -- (\j+1,-\i-1);
+  \draw[line width=0.8pt] (0,0) rectangle (8,-4);
+  % seam column
+  \draw[phic, line width=1.2pt] (0,0) -- (0,-4);
+  \draw[phic, line width=1.2pt] (8,0) -- (8,-4);
+  % vertices
+  \foreach \i in {0,...,4} \foreach \j in {0,...,8} \fill (\j,-\i) circle (1pt);
+  % highlighted cell labels
+  \draw[cellc!80!black, line width=1pt] (2,-2) rectangle (3,-3);
+  \draw[cellc!80!black, line width=1pt] (2,-2) -- (3,-3);
+  \node[anchor=south east, inner sep=1pt, font=\scriptsize\itshape\bfseries] at (2,-2) {a};
+  \node[anchor=south west, inner sep=1pt, font=\scriptsize\itshape\bfseries] at (3,-2) {b};
+  \node[anchor=north east, inner sep=1pt, font=\scriptsize\itshape\bfseries] at (2,-3) {c};
+  \node[anchor=north west, inner sep=1pt, font=\scriptsize\itshape\bfseries] at (3,-3) {d};
+  \draw[-{Stealth[length=3pt]}, black!80] ($(2,-2)+(0.33,-0.52)$) arc[start angle=-150, end angle=160, radius=0.16];
+  \draw[-{Stealth[length=3pt]}, black!80] ($(2,-2)+(0.80,-0.30)$) arc[start angle=-150, end angle=160, radius=0.16];
+  % axes labels
+  \node[anchor=south] at (0,0.05) {$0$};
+  \node[anchor=south] at (4,0.05) {$\pi$};
+  \node[anchor=south] at (8,0.05) {$2\pi$};
+  \draw[-{Stealth[length=4pt]}, phic, line width=0.8pt] (0.6,0.55) -- (7.4,0.55) node[midway, above, font=\small] {$\varphi$ \;(column $j = 0 \dots \text{LON\_BANDS}$)};
+  \foreach \i/\t in {0/0, 1/\frac{\pi}{4}, 2/\frac{\pi}{2}, 3/\frac{3\pi}{4}, 4/\pi} \node[anchor=east] at (-0.08,-\i) {$\i$};
+  \draw[-{Stealth[length=4pt]}, thetac, line width=0.8pt] (-0.75,-0.3) -- (-0.75,-3.7) node[midway, above, rotate=90, font=\small] {$\theta$ \;(row $i$)};
+  \node[anchor=west, align=left] at (8.15,0) {north pole};
+  \node[anchor=west, align=left] at (8.15,-4) {south pole};
+  % legend
+  \begin{scope}[shift={(0,-4.75)}]
+    \fill[keep!25] (0,0) rectangle (0.4,-0.3); \draw[gray!70] (0,0) rectangle (0.4,-0.3);
+    \node[anchor=west] at (0.45,-0.15) {drawn};
+    \fill[pattern=north east lines, pattern color=gray!60] (1.9,0) rectangle (2.3,-0.3); \draw[gray!70] (1.9,0) rectangle (2.3,-0.3);
+    \node[anchor=west] at (2.35,-0.15) {skipped (zero area)};
+    \draw[phic, line width=1.2pt] (6.0,0) -- (6.0,-0.3);
+    \node[anchor=west] at (6.05,-0.15) {seam: same points};
+  \end{scope}
+\end{tikzpicture}\par\vspace{2pt}
+{\small\textbf{Figure 2.} The sphere ``unwrapped'' into its grid of angles (drawn with only 4\,$\times$\,8 cells).
+Every cell becomes two triangles. In the top and bottom rows one triangle has zero area and is skipped.}
+\end{minipage}
+
+\vspace{6pt}\hrule\vspace{2pt}
+
+\begin{multicols}{2}
+\step{1. Every point comes from two angles}
+Instead of listing points by hand, we describe each point by \emph{where it is}: how far down from the top
+({\color{thetac}$\theta$}, from $0$ at the north pole to $\pi$ at the south pole) and how far around
+({\color{phic}$\varphi$}, from $0$ to $2\pi$). With $y$ pointing up:
+\[
+x = r\sin\theta\,\sin\varphi,\qquad y = r\cos\theta,\qquad z = r\sin\theta\,\cos\varphi
+\]
+Read it off Figure 1: $P$ sits at height $r\cos\theta$, and at distance $r\sin\theta$ from the $y$ axis.
+That distance is then split between $x$ and $z$ by the angle $\varphi$.
+
+\step{2. Walk a grid of angles}
+Split $\theta$ into \code{LAT\_BANDS} equal steps and $\varphi$ into \code{LON\_BANDS} equal steps.
+Each pair $(i, j)$ makes one vertex. The vertices are stored row by row, so vertex $(i,j)$ is at
+\[
+\text{index}(i,j) = i\cdot(\text{LON\_BANDS}+1) + j .
+\]
+The last column ($\varphi = 2\pi$) lands on top of the first ($\varphi = 0$). We store it twice anyway,
+because that keeps the index math simple.
+With $24 \times 48$ bands that is $25 \times 49 = 1225$ vertices.
+
+\step{3. Two triangles per cell}
+The four corners of a cell are $a=(i,j)$, $b=(i,j{+}1)$, $c=(i{+}1,j)$, and $d=(i{+}1,j{+}1)$.
+The cell (orange in both figures) is cut along the diagonal $a$--$d$ into triangles
+\[
+(a,\,c,\,d)\quad\text{and}\quad(a,\,d,\,b).
+\]
+Seen from \emph{outside} the sphere, both triangles go \textbf{counter-clockwise}.
+That makes them front faces, so \code{cullMode:\,'back'} throws away only the triangles on the far side.
+
+\step{4. Take care of the poles}
+Every vertex in row $i = 0$ is the north pole, so there $a$ and $b$ are the same point.
+The triangle $(a,d,b)$ would be a flat line with zero area, so we skip it.
+The same thing happens at the south pole ($c = d$), where we skip $(a,c,d)$.
+Total: $2\cdot\text{LON\_BANDS}\cdot(\text{LAT\_BANDS}-1) = 2208$ triangles.
+
+\step{5. Normals (and colors) for free}
+For a sphere centered at the origin, the outward normal is just the direction from the center to the point:
+\[
+\mathbf n = \frac{P}{r} = (\sin\theta\sin\varphi,\ \cos\theta,\ \sin\theta\cos\varphi).
+\]
+We don't need cross products. Neighboring triangles \emph{share} vertices and normals, so the
+fragment shader blends the normals smoothly across each triangle. That is why the sphere looks round
+even though it is made of flat triangles. (The tetrahedron is different: each face has its own copies of its
+vertices, with one flat normal.)
+The color is the normal moved from $[-1,1]$ into $[0,1]$: \ $\text{color} = 0.5\,\mathbf n + 0.5$.
+
+\vspace{3pt}
+{\small Each vertex is 9 floats: \code{X Y Z | NX NY NZ | R G B}.}
+\end{multicols}
+\end{document}
