@@ -1,13 +1,6 @@
 
 import * as Vec3 from "@/lib/math/vec3";
 
-/*
-type vec3 = [number, number, number];
-const normalizeVec3 = Vec3.normalize as (a: vec3) => vec3;
-const crossVec3 = Vec3.cross as (a: vec3, b: vec3) => vec3;
-const subVec3 = Vec3.sub as (a: vec3, b: vec3) => vec3;
-*/
-
 type vec3 = {
   x: number;
   y: number;
@@ -35,9 +28,6 @@ function getInterleaved(data: IndexedVertices): Float32Array {
 
     arr.push(v);
   }
-
-
-
 
   return new Float32Array([]);
 }

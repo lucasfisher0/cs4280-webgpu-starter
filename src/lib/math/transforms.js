@@ -7,11 +7,12 @@ import * as Mat4 from "@/lib/math/mat4.js";
 import * as Vec3 from "@/lib/math/vec3.js";
 
 export function translate(_tx, _ty, _tz) {
+
   return new Float32Array([
-    1, 0, 0, _tx,
-    0, 1, 0, _ty,
-    0, 0, 1, _tz,
-    0, 0, 0, 1,
+    1,     0,   0, 0,
+    0,     1,   0, 0,
+    0,     0,   1, 0,
+    _tx, _ty, _tz, 1,
   ]);
 }
 
@@ -29,9 +30,9 @@ export function shear(_xy, _xz, _yx, _yz, _zx, _zy) {
   // one axis by a multiple of another (e.g. xy shifts X by xy * y).
   // Leave the rest at 0 for a single-axis shear.
   return new Float32Array([
-    1,    _xy,  _xz,  0,
-    _yx,  1,    _yz,  0,
-    _zx,  _zy,  1,    0,
+    1,    _yx,  _zx,  0,
+    _xy,  1,    _zy,  0,
+    _xz,  _yz,  1,    0,
     0,    0,    0,    1,
   ]);
 }
@@ -80,10 +81,10 @@ export function lookAt(_eye, _target, _up) {
   const u = Vec3.normalize(Vec3.cross(r, f));
 
   return new Float32Array([
-     r[0],   r[1],  r[2], -Vec3.dot(r, _eye),
-     u[0],   u[1],  u[2], -Vec3.dot(u, _eye),
-    -f[0],  -f[1], -f[2],  Vec3.dot(f, _eye),
-     0,      0,     0,     1,
+    r[0],         u[0],              -f[0],                    0,
+    r[1],         u[1],              -f[1],                    0,
+    r[2],         u[2],              -f[2],                    0,
+    -Vec3.dot(r, _eye), -Vec3.dot(u, _eye), Vec3.dot(f, _eye), 1,
   ]);
 }
 
@@ -104,7 +105,7 @@ export function perspective(_fovYRadians, _aspect, _near, _far) {
 // Intrinsic Z-Y-X Euler angles (yaw * pitch * roll) — a common convention
 // and a direct source of gimbal lock when pitch approaches +/-90 degrees.
 export function fromEulerZYX(_yaw, _pitch, _roll) {
-  return Mat4.multiplyAll([rotateX(_roll), rotateY(_pitch), rotateZ(_yaw)]);
+  return Mat4.multiplyAll([rotateZ(_roll), rotateY(_pitch), rotateX(_yaw)]);
 }
 
 /** An orthographic projection matrix, same `z` in `[0, 1]` convention as `perspective`. */

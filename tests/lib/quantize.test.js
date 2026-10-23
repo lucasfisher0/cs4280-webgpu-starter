@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { posterizeChannels, quantizeChannel } from "./quantize";
+import { posterizeChannels, quantizeChannel } from "@/lib/image/quantize.js";
 
 describe("Color Quantization", () => {
   test("Quantize 0-255 should correctly step", () => {
@@ -8,7 +8,7 @@ describe("Color Quantization", () => {
     for (const val of [0, 30, 50, 80, 120, 150, 180, 220, 255, 300]) {
       const quantized = quantizeChannel(val, levels);
       expect(quantized % 51).toEqual(0);
-      console.log(`Value '${val}' quantized to '${quantized}' using ${levels} levels.`);
+      // console.log(`Value '${val}' quantized to '${quantized}' using ${levels} levels.`);
     }
   });
 

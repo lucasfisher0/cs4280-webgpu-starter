@@ -76,7 +76,7 @@ export class WavefrontMeshBuilder {
 
         for (const faceStr of args.slice(1)) {
           let poly: Polygon = faceStr.split(/\//).map((val: string) => parseInt(val));
-          // TODO: Edge detection here
+          // TODO: Edge detection here, save for later assignments
           faces.push(poly);
         }
       }

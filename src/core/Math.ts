@@ -203,6 +203,16 @@ export class Mat4 {
     this.arr = data;
   }
 
+  getString(): string {
+    let str: string = "";
+    for (let i = 0; i < this.arr.length; i++) {
+      str += this.arr[i]!.toString().padStart(3, ' ');
+      if (i != 0 && i != this.arr.length && (i+1) % 4 === 0)
+        str += "\n"
+    }
+    return str;
+  }
+
   static fromArray(arr: number[]) {
     return new Mat4(new Float32Array(arr));
   }
@@ -223,8 +233,8 @@ export class Mat4 {
     return new Mat4(JSMat4.multiply(a.arr, b.arr));
   }
 
-  static multiplyVec4(m: Mat4, v: Vec3): Mat4 {
-    return Mat4.fromArray(JSMat4.multiplyVec4(m.toArray(), v.toArray()));
+  static multiplyVec4(m: Mat4, v: Vec4): Vec4 {
+    return Vec4.fromArray(JSMat4.multiplyVec4(m.toArray(), v.toArray()));
   }
 
   static multiplyAll(matrices: Mat4[]): Mat4 {

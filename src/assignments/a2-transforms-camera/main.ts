@@ -293,7 +293,7 @@ async function InitWebGPU() {
     cube.scale = matrixScale(params.scale.x, params.scale.y, params.scale.z);
 
     const modelMatrix = params.order == "TRS-Shear" ?
-      multiply(cube.getTransformMatrix(), shear(params.shear.x, 0, params.shear.y, 0, params.shear.z, 0)) :
+      multiply(cube.getTransformMatrix(), shear(params.shear.x, 0, 0, params.shear.y, params.shear.z, 0)) :
       multiply(shear(params.shear.x, 0, params.shear.y, 0, params.shear.z, 0), cube.getTransformMatrix());
 
     // Projection
@@ -302,8 +302,10 @@ async function InitWebGPU() {
     const mvp = multiplyAll([modelMatrix, camera.getViewMatrix(), projectionMatrix]);
 
     const canvasTexture = context.getCurrentTexture();
-    if (depthTexture && (depthTexture.width !== canvasTexture.width || depthTexture.height !== canvasTexture.height))
+    if (depthTexture && (depthTexture.width !== canvasTexture.width || depthTexture.height !== canvasTexture.height)) {
       depthTexture.destroy();
+      depthTexture = null;
+    }
     if (!depthTexture) {
       device.pushErrorScope('validation');
       depthTexture = device.createTexture({

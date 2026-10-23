@@ -161,8 +161,10 @@ export class Renderer {
     this.tick(getDeltaTime());
 
     const canvasTexture = this.context.getCurrentTexture();
-    if (this.depthTexture && (this.depthTexture.width !== canvasTexture.width || this.depthTexture.height !== canvasTexture.height))
+    if (this.depthTexture && (this.depthTexture.width !== canvasTexture.width || this.depthTexture.height !== canvasTexture.height)) {
       this.depthTexture.destroy();
+      this.depthTexture = null;
+    }
     if (!this.depthTexture) {
       this.device.pushErrorScope('validation');
       this.depthTexture = this.device.createTexture({
