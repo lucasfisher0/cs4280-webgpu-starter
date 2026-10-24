@@ -326,7 +326,21 @@ export class Mat4 {
     );
   }
 
-  /* Object Operations & Properties */
+  transformPoint(p: Vec3): Mat4 {
+    return Mat4.fromArray(JSMat4.transformPoint(this.toArray(), p.toArray()));
+  }
+
+  // perspectiveDivide implemented in Vec4.
+
+  transpose(): Mat4 {
+    return new Mat4(JSMat4.transpose(this.toArray()));
+  }
+
+  invert(): Mat4 {
+    return new Mat4(JSMat4.invert(this.toArray()));
+  }
+
+  /* Static Operations & Properties */
   static multiply(a: Mat4, b: Mat4): Mat4 {
     return new Mat4(JSMat4.multiply(a.arr, b.arr));
   }
@@ -336,24 +350,9 @@ export class Mat4 {
   }
 
   static multiplyAll(matrices: Mat4[]): Mat4 {
-
     return Mat4.fromArray(JSMat4.multiplyAll(
       matrices.map((m: Mat4) => m.toArray())
     ));
-  }
-
-  static transformPoint(m: Mat4, p: Vec3): Mat4 {
-    return Mat4.fromArray(JSMat4.transformPoint(m.toArray(), p.toArray()));
-  }
-
-  // perspectiveDivide implemented in Vec4.
-
-  static transpose(m: Mat4): Mat4 {
-    return new Mat4(JSMat4.transpose(m.toArray()));
-  }
-
-  static invert(m: Mat4, r1: number, r2: number): Mat4 {
-    return new Mat4(JSMat4.invert(m.toArray()));
   }
 }
 
@@ -389,8 +388,8 @@ export const Transform  = {
   lookAt(_eye: Vec3, _target: Vec3, _up: Vec3): Mat4 {
     return new Mat4(JSTransforms.lookAt(_eye, _target, _up));
   },
-  perspective(_eye: Vec3, _target: Vec3, _up: Vec3): Mat4 {
-    return new Mat4(JSTransforms.perspective(_eye, _target, _up));
+  perspective(_fovYRadians: number, _aspect: number, _near: number, _far: number): Mat4 {
+    return new Mat4(JSTransforms.perspective(_fovYRadians, _aspect, _near, _far));
   },
   ortho(_left: number, _right: number, _bottom: number, _top: number,
                _near: number, _far: number): Mat4 {

@@ -6,8 +6,21 @@ import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
 import {createShaderModule} from "@/lib/webgpu/shaders";
 import {SceneNode} from "@/core/scenegraph/SceneNode.ts";
 import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math.ts"
+import {BlinnPhong} from "@/core/shaders/BlinnPhong.ts";
+import {PipelineBuilder} from "@/core/render/Pipeline.ts";
+import type {Shader} from "@/core/shaders/Shader.ts";
+import type {Camera} from "@/core/render/Camera.ts";
+import {OrbitCamera} from "@/core/render/OrbitCamera.ts";
+import {ModelNode} from "@/core/scenegraph/ModelNode.ts";
 
 type MaterialGroup = [id: string, shader: string, buffer: GPUBuffer, bindGroup: GPUBindGroup];
+
+let currTime: number | null = null;
+function getDeltaTime(): number {
+  const oldTime = currTime;
+  currTime = performance.now();
+  return !oldTime ? 0.0 : (currTime - oldTime) * 0.001;
+};
 
 const tickData: TickData = {deltaTime: 0.0, drag_movement: [0.0, 0.0]};
 export const renderTickEvent = new CustomEvent<TickData>("tick", {
@@ -15,15 +28,18 @@ export const renderTickEvent = new CustomEvent<TickData>("tick", {
   bubbles: true
 });
 
+const CAMERA_DEFAULT_POSITION: Mat4 = Transform.translate(3, 3, -3);
 
 export class Renderer implements Disposable {
   // WebGPU
-  device: GPUDevice | null = null;
-  format: GPUTextureFormat | null = null;
-  context: GPUCanvasContext | null = null;
+  device: GPUDevice;
+  format: GPUTextureFormat;
+  context: GPUCanvasContext;
+  shader: Shader;
+  pipeline: GPURenderPipeline;
 
   // Canvas
-  #canvas: HTMLCanvasElement | null = null;
+  #canvas: HTMLCanvasElement;
   #abortController = new AbortController(); // Can be used to remove listeners
   pointer_pos: number[] | null = null;
   pointer_last: number[] | null = null;
@@ -36,47 +52,25 @@ export class Renderer implements Disposable {
     rotation: Mat4.Identity(),
     scale: Mat4.Identity()
   });
+  camera: Camera;
 
-  constructor(device: GPUDevice, canvas: HTMLCanvasElement) {
+  constructor(device: GPUDevice, canvas: HTMLCanvasElement, camera?: Camera) {
     this.device = device;
     this.format = navigator.gpu.getPreferredCanvasFormat();
+    this.#canvas = canvas;
+    this.context = configureContext(this.#canvas, this.device!, this.format!);
     this.setCanvas(canvas);
 
-    // Uniform Buffer
-    const UNIFORM_SIZE: number = 16 * 4;
-    device.pushErrorScope('validation');
-    let uniformBuffer: GPUBuffer = device.createBuffer({
-      label: "transform-uniform",
-      size: UNIFORM_SIZE,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    // Camera
+    this.camera = camera ?? new OrbitCamera({
+      name: "Camera",
+      translation: CAMERA_DEFAULT_POSITION
     });
-    device.popErrorScope().then(e => e && console.error('uniform buffer error:', e.message));
+    this.scene.addChild(this.camera);
 
-    const bindGroupLayout: GPUBindGroupLayout = device.createBindGroupLayout({
-      label: "u-layout",
-      entries: [{
-        binding: 0,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: {type: "uniform"}
-      }]
-    });
-
-    device.pushErrorScope('validation');
-    const bindGroup: GPUBindGroup = device.createBindGroup({
-      label: "u-group",
-      layout: bindGroupLayout,
-      entries: [{
-        binding: 0,
-        resource: {buffer: uniformBuffer}
-      }]
-    });
-    device.popErrorScope().then(e => e && console.error('bindgroup error:', e.message));
-
-    // TODO "CUBE PIPELINE"
-
-
-
-
+    // Shader & Pipeline
+    this.shader = new BlinnPhong(this.device);
+    this.pipeline = this.createPipeline(this.shader);
   }
 
   [Symbol.dispose]() {
@@ -110,6 +104,14 @@ export class Renderer implements Disposable {
     this.context = configureContext(this.#canvas, this.device!, this.format!);
   }
 
+  createPipeline(shader: Shader): GPURenderPipeline {
+    let builder = new PipelineBuilder(this.device!, this.format!, shader);
+    this.device!.pushErrorScope('validation');
+    const pipeline = this.device!.createRenderPipeline(builder.createDescriptor());
+    this.device!.popErrorScope().then(e => e && console.error('Pipeline creation error:', e.message));
+    return pipeline;
+  }
+
   tick(deltaTime: number) {
     tickData.deltaTime = deltaTime;
     tickData.drag_movement = [0.0, 0.0];
@@ -128,45 +130,8 @@ export class Renderer implements Disposable {
     window.dispatchEvent(renderTickEvent);
   }
 
-  registerMaterial(material: Material) {
-    if (!this.device)
-      throw new Error("registerMaterial: device was invalid.");
-
-    if (!this.materials.has(material)) {
-      this.device.pushErrorScope("validation");
-      const buffer = this.device.createBuffer(material.getDescriptor());
-      this.device.popErrorScope().then(e => e && console.error('Failed to create buffer for material:', e.message));
-      // this.matBuffers.set(material.id, buffer);
-
-      this.device.pushErrorScope("validation");
-      const groupLayout = material.getLayout();
-      const bindGroupLayout = this.device.createBindGroupLayout(groupLayout);
-      const bindGroup = this.device.createBindGroup({
-        label: `${material.id}-uniform`,
-        layout: bindGroupLayout,
-        entries: [{
-          binding: 0,
-          resource: {buffer: buffer}
-        }]
-      });
-      this.device.popErrorScope().then(e => e && console.error('uniform buffer error:', e.message));
-      // this.matBindings.set(material.id, bindGroup);
-
-      this.materials.set(material, [
-        material.id,
-        "",
-        buffer,
-        bindGroup
-      ]);
-    }
-  }
-
-  recheckShaders() {
-    //for(const mat of this.matBuffers.values()) { }
-  }
-
   depthTexture: GPUTexture | null = null;
-  async renderFrame() {
+  renderFrame() {
     if (!this.device || !this.context)
       throw new Error("Attempted to render frame without initializing render.")
 
@@ -203,19 +168,57 @@ export class Renderer implements Disposable {
       }
     })
 
-    this.device.queue.writeBuffer(uniformBuffer, 0, mvp);
+    const viewMatrix = this.camera.getViewMatrix();
+    this.device.queue.writeBuffer(this.shader.uniformBuffer, 64, new Float32Array(viewMatrix.toArray()));
+
+    const a = this.#canvas.clientWidth / this.#canvas.clientHeight;
+    const projectionMatrix = Transform.perspective(this.camera.verticalFov, a, this.camera.clipNear, this.camera.clipFar);
+    this.device.queue.writeBuffer(this.shader.uniformBuffer, 128, new Float32Array(projectionMatrix.toArray()));
 
 
-    // this.device.queue.writeBuffer(uniformBuffer, 0, transpose(mvp));
-    // passEncoder.setPipeline(pipeline);
-    // passEncoder.setVertexBuffer(0, vertexBuffer);
-    // passEncoder.setBindGroup(0, bindGroup);
-    // passEncoder.draw(36); // 6 faces x 2 triangles x 3 vertices
-    // passEncoder.setPipeline(axisPipeline);
-    // passEncoder.setVertexBuffer(0, axisBuffer);
-    // passEncoder.setBindGroup(0, bindGroup);
-    // passEncoder.draw(6);
+    // TODO: REMOVE
+    const params = {
+      cameraDistance: 5,
+      cameraSpin: true,
+      depth: 1,
+      modelScale: 1,
+      diffuse: {r: 1, g: 0, b: 1},
+      lightPosition: {x: 0, y: 0, z: 0},
+      lightStrength: 0.8,
+      ambientStrength: 0.2,
+      specularCoefficient: 0.8,
+      exponent: 1000,
+    };
 
+    const camPosition = this.camera.getWorldTransform().getPosition();
+    this.device.queue.writeBuffer(this.shader.uniformBuffer, 256, new Float32Array([...camPosition.toArray(), params.ambientStrength]));
+    this.device.queue.writeBuffer(this.shader.uniformBuffer, 272, new Float32Array(
+      [params.lightPosition.x, params.lightPosition.y, params.lightPosition.z, params.lightStrength]
+    ));
+    this.device.queue.writeBuffer(this.shader.uniformBuffer, 288, new Float32Array(
+      [params.diffuse.r, params.diffuse.g, params.diffuse.b, params.exponent, params.specularCoefficient]
+    ));
+
+    passEncoder.setPipeline(this.pipeline);
+    passEncoder.setBindGroup(0, this.shader.bindGroup);
+
+    const slot = 0;
+    const drawNode = (_node: SceneNode) => {
+      _node.children.forEach((child: SceneNode) => {drawNode(child)});
+      if (_node instanceof ModelNode)
+      {
+        const modelMatrix = _node.getTransformMatrix();
+        this.device.queue.writeBuffer(this.shader.uniformBuffer, 0, new Float32Array(modelMatrix.toArray()));
+
+        const normalMatrix = modelMatrix.invert();
+        this.device.queue.writeBuffer(this.shader.uniformBuffer, 0, new Float32Array(normalMatrix.toArray()));
+
+        const mesh = _node.mesh;
+        mesh.draw(passEncoder, slot);
+      }
+    }
+
+    drawNode(this.scene);
     passEncoder.end();
     this.device.pushErrorScope('validation');
     this.device.queue.submit([commandEncoder.finish()])

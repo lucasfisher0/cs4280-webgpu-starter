@@ -20,4 +20,4 @@ declare module '*.wgsl?raw' {
 }
 
 //declare const __APP_VERSION__: string
-declare const __ENABLE_SCENE_EDITOR__: boolean
+declare const __ENABLE_SCENE_EDITOR__: boolean;

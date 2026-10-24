@@ -1,3 +1,5 @@
+//import '@/global.ts'
+
 // External
 import {GUI, Controller} from "lil-gui";
 
@@ -17,6 +19,8 @@ import {OrbitCamera} from "@/core/render/OrbitCamera.ts";
 import shaderCode from "./shaders.wgsl?raw";
 //import type {PointerMovement, TickData} from "@/core/TickData.ts";
 import {Renderer} from "@/core/render/Render.ts";
+import {ModelNode} from "@/core/scenegraph/ModelNode.ts";
+import {Material} from "@/core/render/Material.ts";
 
 //#region GUI
 const gui = new GUI( { container: document.getElementById( 'controlBox' )! } );
@@ -49,7 +53,6 @@ const params = {
 const folderModel = gui.addFolder("Model");
 folderModel.add(params, "modelScale", 0.5, 3, 0.25).name("Model Scale");
 const diffuseControl = folderModel.addColor(params, "diffuse").name("Diffuse Color");
-const depthControl = folderModel.add(params, "depth", 0, 5, 1).name("Recursion Depth").onChange(() => onDepthUpdated());
 const specularControl = folderModel.add(params, "specularCoefficient", 0, 1, 0.1).name("Specular Coefficient");
 const exponentControl = folderModel.add(params, "exponent").name("Exponent");
 
@@ -88,25 +91,25 @@ async function InitWebGPU() {
   using renderer: Renderer = new Renderer(device, canvas);
   const scene = renderer.scene;
 
-  const cube = createCubeGeometry(device);
-  cube.draw(null);
-
-
+  const cubeMesh = createCubeGeometry(device, 1);
+  const cubeNode = new ModelNode(cubeMesh, new Material(), {
+    name: "Cube",
+  });
+  scene.addChild(cubeNode);
 
   window.addEventListener("tick", (event) => {
     tick(event.detail);
   });
-  await renderer.renderFrame();
+
+  function renderFrame() {
+    renderer.renderFrame();
+    requestAnimationFrame(renderFrame);
+  }
+  requestAnimationFrame(renderFrame);
 }
 
 
 function tick(detail: TickData) {
-
-
-
-
-
-
   // NOOP yet
 }
 

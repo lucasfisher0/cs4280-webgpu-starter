@@ -8,10 +8,7 @@ interface SceneNodeDescriptor {
   translation?: Mat4 | null;
   rotation?: Mat4 | null;
   scale?: Mat4 | null;
-  mesh?: undefined | null;
-  data?: undefined | null;
 }
-
 export type {SceneNodeDescriptor};
 
 /**

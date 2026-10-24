@@ -16,6 +16,8 @@ const pages = [
   "assignments/a1-image-compression/index.html",
   "assignments/a2-transforms-camera/index.html",
   "assignments/a3-sierpinski-gasket/index.html",
+  "assignments/a3-sierpinski-gasket/index.html",
+  "assignments/a4-instancing-textures/index.html",
   "activities/sample-triangle/index.html",
   "activities/pyramid-mvp/index.html",
   "activities/pyramid-shaded/index.html",

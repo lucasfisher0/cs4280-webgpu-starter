@@ -1,7 +1,6 @@
 import {createShaderModule} from "@/lib/webgpu/shaders";
 import shaderCode from "./shaders.wgsl?raw";
 import {Camera} from "@/core/render/Camera";
-import {type RenderTick, renderTickEvent} from "@/core/render/Render"
 import {GUI, Controller} from "lil-gui";
 import {Entity} from "@/assignments/a2-transforms-camera/entity";
 import * as Mat4 from "@/lib/math/mat4";
@@ -18,6 +17,7 @@ import {
   generateGasket,
 } from "@/assignments/a3-sierpinski-gasket/tetrahedron";
 import {configureContext} from "@/lib/webgpu/context";
+import {OrbitCamera} from "@/core/render/OrbitCamera.ts";
 
 type PointerMovement = [x: number, y: number];
 type vec3 = [number, number, number];
@@ -73,7 +73,7 @@ const lightStrengthControl = gui.add(params, "lightStrength", 0, 1.5, 0.1).name(
 const AmbientStrengthControl = gui.add(params, "ambientStrength", 0.0, 1, 0.05).name("Ambient Strength");
 //#endregion
 
-const camera = new Camera();
+const camera = new OrbitCamera({name: "Camera"});
 
 let tetrahedronModel: Float32Array = new Float32Array([]);
 
@@ -202,7 +202,7 @@ async function InitWebGPU() {
 //#endregion
 
   addEventListener("tick", (e: Event) => {
-    const tickEvent = e as CustomEvent<RenderTick>;
+    const tickEvent = e as CustomEvent<TickData>;
     tick(tickEvent.detail);
   })
 
@@ -212,7 +212,7 @@ async function InitWebGPU() {
     // Tick
     const deltaTime = getDeltaTime();
     let drag_movement = [0.0, 0.0];
-    let tickData: RenderTick = {deltaTime: deltaTime, drag_movement: [0.0, 0.0]};
+    let tickData: TickData = {deltaTime: deltaTime, drag_movement: [0.0, 0.0]};
     if (dragging && pointer_pos) {
       if (pointer_last) {
         tickData.drag_movement = [
@@ -271,8 +271,8 @@ async function InitWebGPU() {
     const normalMatrix = Mat4.invert(modelMatrix);
     device.queue.writeBuffer(uniformBuffer, 192, normalMatrix); // Needs to be transposed, so DON'T transpose it
 
-    const camPosition = camera.getPosition()
-    device.queue.writeBuffer(uniformBuffer, 256, new Float32Array([...camPosition, params.ambientStrength]));
+    const camPosition = camera.getWorldTransform().getPosition();
+    device.queue.writeBuffer(uniformBuffer, 256, new Float32Array([...camPosition.toArray(), params.ambientStrength]));
     device.queue.writeBuffer(uniformBuffer, 272, new Float32Array(
       [params.lightPosition.x, params.lightPosition.y, params.lightPosition.z, params.lightStrength]
     ));
@@ -305,13 +305,13 @@ async function InitWebGPU() {
 
 const CAM_SENS = 5.0;
 
-function tick(data: RenderTick) {
+function tick(data: TickData) {
   camera.tetherDistance = params.cameraDistance;
-  camera.spinSpeed = Number(params.cameraSpin) * 0.2;
-  camera.addRotation(
-    data.deltaTime * data.drag_movement[0] * CAM_SENS,
-    data.deltaTime * data.drag_movement[1] * CAM_SENS);
-  camera.tick(data);
+  camera.spinEnabled = params.cameraSpin;
+  // camera.addRotation(
+  //   data.deltaTime * data.drag_movement[0] * CAM_SENS,
+  //   data.deltaTime * data.drag_movement[1] * CAM_SENS);
+  // camera.tick(data);
 }
 
 void InitWebGPU();

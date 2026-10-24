@@ -6,7 +6,7 @@ import {SceneNode} from "@/core/scenegraph/SceneNode";
   VERTICAL,
   DEGREES,
   RADIANS
-}
+} // TODO: use these to support setting FOV in any format
 */
 
 /**
@@ -16,8 +16,6 @@ export class Camera extends SceneNode {
   clipNear: number = 1;
   clipFar: number = 50;
   verticalFov: number = 1.0472; // 60 deg, vertical FoV
-
-
 
   getViewMatrix(target?: Vec3) {
     return Transform.lookAt(
