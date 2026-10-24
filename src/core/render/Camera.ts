@@ -1,7 +1,13 @@
+import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math.ts"
 import {SceneNode} from "@/core/scenegraph/SceneNode";
-import {Transform} from "@/core/Math.ts"
 
-//import {lookAt} from "@/lib/math/transforms.js";
+/* export enum FOV_TYPE {
+  HORIZONTAL,
+  VERTICAL,
+  DEGREES,
+  RADIANS
+}
+*/
 
 /**
  * Custom camera class to encapsulate all behavior, such as positioning and controls.
@@ -11,15 +17,13 @@ export class Camera extends SceneNode {
   clipFar: number = 50;
   verticalFov: number = 1.0472; // 60 deg, vertical FoV
 
-  getViewMatrix(target?: Float32Array) {
-    target ??= new Float32Array([0, 0, 0]);
 
-    let trans = this.getWorldTransform();
 
+  getViewMatrix(target?: Vec3) {
     return Transform.lookAt(
       this.getWorldTransform().getPosition(),
-      target,
-      new Float32Array([0, 1, 0]),
+      target ?? Vec3.Zero(),
+      new Vec3(0, 1, 0)
     );
   }
 }

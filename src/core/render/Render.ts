@@ -1,44 +1,26 @@
-import {configureContext} from "@/lib/webgpu/context";
+import {configureContext, getPreferredCanvasFormat} from "@/lib/webgpu/context";
+
+
 import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
 // import {Model} from "@/core/render/Model";
 import {createShaderModule} from "@/lib/webgpu/shaders";
+import {SceneNode} from "@/core/scenegraph/SceneNode.ts";
+import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math.ts"
 
 type MaterialGroup = [id: string, shader: string, buffer: GPUBuffer, bindGroup: GPUBindGroup];
-type PointerMovement = [x: number, y: number];
 
-let currTime: number | null = null;
-function getDeltaTime(): number {
-  const oldTime = currTime;
-  currTime = performance.now();
-  return !oldTime ? 0.0 : (currTime - oldTime) * 0.001;
-}
-
-interface RenderTick {
-  deltaTime: number;
-  drag_movement: PointerMovement;
-}
-export type { RenderTick };
-
-const tickData: RenderTick = {deltaTime: 0.0, drag_movement: [0.0, 0.0]};
-export const renderTickEvent = new CustomEvent<RenderTick>("tick", {
+const tickData: TickData = {deltaTime: 0.0, drag_movement: [0.0, 0.0]};
+export const renderTickEvent = new CustomEvent<TickData>("tick", {
   detail: tickData,
   bubbles: true
 });
 
-/*
-export class Renderer {
+
+export class Renderer implements Disposable {
   // WebGPU
-  adapter: GPUAdapter;
   device: GPUDevice | null = null;
   format: GPUTextureFormat | null = null;
   context: GPUCanvasContext | null = null;
-
-  // Models, Models, etc.
-  models: Map<string, Model> = new Map<string, Model>();
-  vertexBuffer: GPUBuffer | null = null;
-  materials: Map<Material, MaterialGroup> = new Map<Material, MaterialGroup>();
-  shaders: Map<string, string> = new Map<string, string>();
-  pipelines: Map<string, GPURenderPipeline> = new Map<string, GPURenderPipeline>();
 
   // Canvas
   #canvas: HTMLCanvasElement | null = null;
@@ -47,14 +29,58 @@ export class Renderer {
   pointer_last: number[] | null = null;
   dragging = false;
 
-  constructor(adapter: GPUAdapter, canvas: HTMLCanvasElement | null) {
-    if (!adapter)
-      throw new Error("Render constructor was not given a valid adapter.");
-    this.adapter = adapter;
-    this.format = navigator.gpu.getPreferredCanvasFormat();
+  // Scene Graph
+  scene: SceneNode = new SceneNode({
+    name: "root",
+    translation: Mat4.Identity(),
+    rotation: Mat4.Identity(),
+    scale: Mat4.Identity()
+  });
 
-    if (canvas)
-      this.#canvas = canvas;
+  constructor(device: GPUDevice, canvas: HTMLCanvasElement) {
+    this.device = device;
+    this.format = navigator.gpu.getPreferredCanvasFormat();
+    this.setCanvas(canvas);
+
+    // Uniform Buffer
+    const UNIFORM_SIZE: number = 16 * 4;
+    device.pushErrorScope('validation');
+    let uniformBuffer: GPUBuffer = device.createBuffer({
+      label: "transform-uniform",
+      size: UNIFORM_SIZE,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    device.popErrorScope().then(e => e && console.error('uniform buffer error:', e.message));
+
+    const bindGroupLayout: GPUBindGroupLayout = device.createBindGroupLayout({
+      label: "u-layout",
+      entries: [{
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: {type: "uniform"}
+      }]
+    });
+
+    device.pushErrorScope('validation');
+    const bindGroup: GPUBindGroup = device.createBindGroup({
+      label: "u-group",
+      layout: bindGroupLayout,
+      entries: [{
+        binding: 0,
+        resource: {buffer: uniformBuffer}
+      }]
+    });
+    device.popErrorScope().then(e => e && console.error('bindgroup error:', e.message));
+
+    // TODO "CUBE PIPELINE"
+
+
+
+
+  }
+
+  [Symbol.dispose]() {
+    // TODO: IMPLEMENT
   }
 
   setCanvas(canvas: HTMLCanvasElement) {
@@ -82,18 +108,6 @@ export class Renderer {
 
     this.#canvas = canvas;
     this.context = configureContext(this.#canvas, this.device!, this.format!);
-  }
-
-  async init() {
-    this.device = await this.adapter.requestDevice();
-    if (this.#canvas)
-      this.setCanvas(this.#canvas);
-
-    this.vertexBuffer = this.device.createBuffer({
-      label: "models-vertex-buffer",
-      size: 128 * 6 * 4, // 128 vertex buffer
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-    });
   }
 
   tick(deltaTime: number) {
@@ -152,7 +166,7 @@ export class Renderer {
   }
 
   depthTexture: GPUTexture | null = null;
-  renderFrame() {
+  async renderFrame() {
     if (!this.device || !this.context)
       throw new Error("Attempted to render frame without initializing render.")
 
@@ -173,10 +187,7 @@ export class Renderer {
       this.device.popErrorScope().then(e => e && console.error('depth texture error:', e.message));
     }
 
-    const commandEncoder = this.device.createCommandEncoder({
-      label: 'frame-encoder',
-    })
-
+    const commandEncoder = this.device.createCommandEncoder({label: 'frame-encoder',});
     const passEncoder = commandEncoder.beginRenderPass({
       colorAttachments: [{
         view: canvasTexture.createView(),
@@ -191,6 +202,8 @@ export class Renderer {
         depthStoreOp: "store"
       }
     })
+
+    this.device.queue.writeBuffer(uniformBuffer, 0, mvp);
 
 
     // this.device.queue.writeBuffer(uniformBuffer, 0, transpose(mvp));
@@ -209,4 +222,3 @@ export class Renderer {
     this.device.popErrorScope().then(e => e && console.error('Error on queue submission: ', e.message));
   }
 }
-*/

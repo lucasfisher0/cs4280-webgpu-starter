@@ -357,39 +357,43 @@ export class Mat4 {
   }
 }
 
-export class Transform {
-  static translate(_tx: number, _ty: number, _tz: number): Mat4 {
+// This should be the equivalent of a completely static class.
+export const Transform  = {
+  // Standard Transforms excluding Rotation
+  translate(_tx: number, _ty: number, _tz: number): Mat4 {
     return new Mat4(JSTransforms.translate(_tx, _ty, _tz));
-  };
-  static scale(_sx: number, _sy: number, _sz: number): Mat4 {
+  },
+  scale(_sx: number, _sy: number, _sz: number): Mat4 {
     return new Mat4(JSTransforms.scale(_sx, _sy, _sz));
-  };
-  static shear(_xy: number, _xz: number, _yx: number,
+  },
+  shear(_xy: number, _xz: number, _yx: number,
                _yz: number, _zx: number, _zy: number): Mat4 {
     return new Mat4(JSTransforms.shear(_xy, _xz, _yx, _yz, _zx, _zy));
-  };
+  },
 
-  static rotateX(_radians: number): Mat4 {
+  // Rotations
+  rotateX(_radians: number): Mat4 {
     return new Mat4(JSTransforms.rotateX(_radians));
-  };
-  static rotateY(_radians: number): Mat4 {
+  },
+  rotateY(_radians: number): Mat4 {
     return new Mat4(JSTransforms.rotateY(_radians));
-  };
-  static rotateZ(_radians: number): Mat4 {
+  },
+  rotateZ(_radians: number): Mat4 {
     return new Mat4(JSTransforms.rotateZ(_radians));
-  };
-  static fromEulerZYX(_yaw: number, _pitch: number, _roll: number): Mat4 {
+  },
+  fromEulerZYX(_yaw: number, _pitch: number, _roll: number): Mat4 {
     return new Mat4(JSTransforms.fromEulerZYX(_yaw, _pitch, _roll));
-  }
+  },
 
-  static lookAt(_eye: Vec3, _target: Vec3, _up: Vec3): Mat4 {
+  // View Operations
+  lookAt(_eye: Vec3, _target: Vec3, _up: Vec3): Mat4 {
     return new Mat4(JSTransforms.lookAt(_eye, _target, _up));
-  };
-  static perspective(_eye: Vec3, _target: Vec3, _up: Vec3): Mat4 {
+  },
+  perspective(_eye: Vec3, _target: Vec3, _up: Vec3): Mat4 {
     return new Mat4(JSTransforms.perspective(_eye, _target, _up));
-  };
-  static ortho(_left: number, _right: number, _bottom: number, _top: number,
+  },
+  ortho(_left: number, _right: number, _bottom: number, _top: number,
                _near: number, _far: number): Mat4 {
     return new Mat4(JSTransforms.ortho(_left, _right, _bottom, _top, _near, _far));
-  }
+  },
 }

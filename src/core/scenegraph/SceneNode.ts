@@ -1,6 +1,5 @@
 import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math"
 import * as JSSceneNode from "@/lib/scenegraph/SceneNode.js"
-import type {RenderTick} from "@/core/render/Render.ts";
 
 let nodeCount: number = 0;
 
@@ -12,7 +11,8 @@ interface SceneNodeDescriptor {
   mesh?: undefined | null;
   data?: undefined | null;
 }
-export type { SceneNodeDescriptor };
+
+export type {SceneNodeDescriptor};
 
 /**
  * Corresponds to `SceneNode` from given content. Represents a singular transform.
@@ -67,7 +67,7 @@ export class SceneNode {
     return Mat4.multiplyAll([this.translation, this.rotation, this.scale]);
   }
 
-  tick(data: RenderTick): void {
+  tick(data: TickData): void {
     // NOOP - purely a virtual function
   }
 }

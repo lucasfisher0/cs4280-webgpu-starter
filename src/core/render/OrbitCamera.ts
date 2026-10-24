@@ -1,6 +1,4 @@
 import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math.ts"
-
-import {lookAt} from "@/lib/math/transforms.js";
 import {Camera} from "@/core/render/Camera.ts";
 
 /**
@@ -9,68 +7,33 @@ import {Camera} from "@/core/render/Camera.ts";
 export class OrbitCamera extends Camera {
   tetherDistance: number = 5;
   tetherRotation: [number, number, number] = [0, 0, 0];
+  sensitivity: [number, number] = [5.0, 5.0];
+
   spinSpeed: number = 0.2; // Speed to spin in radians/sec
+  spinEnabled: boolean = false;
 
   override getWorldTransform(): Mat4 {
+    // Compose the real node position with the camera boom
+    let origin: Mat4 = super.getWorldTransform();
+    let tether: Mat4 = Mat4.multiply(
+      Transform.fromEulerZYX(this.tetherRotation[0], this.tetherRotation[1], this.tetherRotation[2]),
+      Transform.translate(0, 0, -this.tetherDistance)
+    );
 
-    let pos = Mat4.multiply(Transform.translate(0, 0, -this.tetherDistance), Mat4.Identity());
-
-
-
-
-
-
-
-
-    let origin = super.getWorldTransform();
-
-
-
-
-
-
-
-
-
+    return Mat4.multiply(tether, origin);
   }
 
-
-  /** Camera position derived from tether distance + yaw/pitch. */
-  getPosition(): Float32Array {
-    const yaw = this.rotation[0]!;
-    const pitch = this.rotation[1]!;
-    const r = this.tetherDistance;
-
-    return new Float32Array([
-      r * Math.cos(pitch) * Math.sin(yaw),
-      r * Math.sin(pitch),
-      r * Math.cos(pitch) * Math.cos(yaw)
-    ]);
-  }
-
-  addRotation(yaw: number, pitch: number) {
-    if (!this.rotation || this.rotation.length < 3)
-      return;
-
-    this.rotation[0]! += yaw;
-    this.rotation[1]! += pitch;
+  addRotation(yaw: number, pitch: number, roll: number = 0) {
+    this.tetherRotation[0]! += yaw * this.sensitivity[0];
+    this.tetherRotation[1]! += pitch * this.sensitivity[1];
 
     const DEG_89 = 1.55334303;
-    if (Math.abs(this.rotation[1]!) > DEG_89)
-      this.rotation[1] = DEG_89 * Math.sign(this.rotation[1]!);
+    if (Math.abs(this.tetherRotation[1]!) > DEG_89)
+      this.tetherRotation[1] = DEG_89 * Math.sign(this.tetherRotation[1]!);
   }
 
-  getViewMatrix(target?: Float32Array) {
-    target ??= new Float32Array([0, 0, 0]);
-
-    return lookAt(
-      this.getPosition(),
-      target,
-      new Float32Array([0, 1, 0]),
-    );
-  }
-
-  tick(data: RenderTick) {
-    this.rotation[0]! += this.spinSpeed * data.deltaTime;
+  override tick(data: TickData) {
+    if (this.spinEnabled)
+      this.tetherRotation[0]! += this.spinSpeed * data.deltaTime;
   }
 }
