@@ -1,5 +1,6 @@
 import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math"
 import * as JSSceneNode from "@/lib/scenegraph/SceneNode.js"
+import type {RenderTick} from "@/core/render/Render.ts";
 
 let nodeCount: number = 0;
 
@@ -28,7 +29,7 @@ export class SceneNode {
   constructor(desc: SceneNodeDescriptor) {
     this.name = desc.name ?? `node_${nodeCount}`;
     this.translation = desc.translation ?? Transform.translate(0, 0, 0);
-    this.rotation = desc.rotation ?? Mat4.identity();
+    this.rotation = desc.rotation ?? Mat4.Identity();
     this.scale = desc.scale ?? Transform.scale(1, 1, 1);
     nodeCount++;
   }
@@ -64,5 +65,9 @@ export class SceneNode {
   /** Returns composed TRS matrix in local-space. **/
   getTransformMatrix(): Mat4 {
     return Mat4.multiplyAll([this.translation, this.rotation, this.scale]);
+  }
+
+  tick(data: RenderTick): void {
+    // NOOP - purely a virtual function
   }
 }

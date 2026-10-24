@@ -19,18 +19,60 @@ export class Vec2 {
     this.y = y;
   }
 
-  static fromArray(arr: any[]): Vec2 {
-    return new Vec2(arr[0], arr[1]);
-  }
-
-  toArray(): number[] {
-    return [this.x, this.y];
-  }
-
+  /* Object Meta */
   clone(): Vec2 {
     return Vec2.fromArray(JSVec2.clone(this.toArray()));
   }
 
+  static Zero(): Vec2 {
+    return new Vec2(0, 0);
+  }
+
+  // Converts a flat array of numbers to Vec2
+  static fromArray(arr: any[]): Vec2 {
+    return new Vec2(arr[0], arr[1]);
+  }
+
+  // Returns Vec2 as a 2-value array
+  toArray(): number[] {
+    return [this.x, this.y];
+  }
+
+  // Converts an array of Vec2 into a flat array of numbers
+  static flatArray(arr: Vec2[]): number[] {
+    return arr.flatMap(vec => vec.toArray());
+  }
+
+  // Converts an array of numbers into an array of Vec2
+  static fromList(list: number[] | Float32Array): Vec2[] {
+    let arr: Vec2[] = [];
+    for (let i = 0; i < list.length; i += 2) {
+      arr.push(new Vec2(
+        list[i]!,     // TODO: is there any way to do val ?? throw exception inline as in C#?
+        list[i + 1]! // Also, there should be more safety here!
+      ));
+    }
+    return arr;
+  }
+
+  /* Object Operations & Properties */
+  length(): number {
+    return JSVec2.length(this.toArray());
+  }
+
+  normalize() {
+    let xy = JSVec2.normalize(this.toArray());
+    this.x = xy[0] ?? this.x;
+    this.y = xy[1] ?? this.y;
+  }
+
+  negate() {
+    let xy = JSVec2.negate(this.toArray());
+    this.x = xy[0] ?? this.x;
+    this.y = xy[1] ?? this.y;
+  }
+
+  /* Static Operations */
   static add(a: Vec2, b: Vec2): Vec2 {
     return Vec2.fromArray(JSVec2.add(a.toArray(), b.toArray()));
   }
@@ -47,25 +89,9 @@ export class Vec2 {
     return JSVec2.dot(a.toArray(), b.toArray());
   }
 
-  length(): number {
-    return JSVec2.length(this.toArray());
-  }
-
-  normalize() {
-    let xy = JSVec2.normalize(this.toArray());
-    this.x = xy[0] ?? this.x;
-    this.y = xy[1] ?? this.y;
-  }
-
   static lerp(a: Vec2, b: Vec2, t: number): Vec2 {
     let xy = JSVec2.lerp(a.toArray(), b.toArray(), t);
     return new Vec2(xy[0], xy[1]);
-  }
-
-  negate() {
-    let xy = JSVec2.negate(this.toArray());
-    this.x = xy[0] ?? this.x;
-    this.y = xy[1] ?? this.y;
   }
 }
 
@@ -80,18 +106,65 @@ export class Vec3 {
     this.z = z;
   }
 
-  static fromArray(arr: any[]): Vec3 {
-    return new Vec3(arr[0], arr[1], arr[2]);
-  }
-
-  toArray(): number[] {
-    return [this.x, this.y, this.z];
-  }
-
+  /* Object Meta */
   clone(): Vec3 {
     return Vec3.fromArray(JSVec3.clone(this.toArray()));
   }
 
+  static Zero(): Vec3 {
+    return new Vec3(0, 0, 0);
+  }
+
+  // Converts a flat array of numbers to Vec3
+  static fromArray(arr: any[]): Vec3 {
+    return new Vec3(arr[0], arr[1], arr[2]);
+  }
+
+  // Returns Vec3 as an array of numbers
+  toArray(): number[] {
+    return [this.x, this.y, this.z];
+  }
+
+  // Converts an array of Vec3 into a flat array of numbers
+  static flatArray(arr: Vec3[]): number[] {
+    return arr.flatMap(vec => vec.toArray());
+  }
+
+  // Converts an array of numbers into an array of Vec3
+  static fromList(list: number[] | Float32Array): Vec3[] {
+    let arr: Vec3[] = [];
+    for (let i = 0; i < list.length; i += 3) {
+      arr.push(new Vec3(
+        list[i]!,     // TODO: is there any way to do val ?? throw exception inline as in C#?
+        list[i + 1]!, // Also, there should be more safety here!
+        list[i + 2]!,
+      ));
+    }
+    return arr;
+  }
+
+  /* Object Operations & Properties */
+  length(): number {
+    return JSVec3.length(this.toArray());
+  }
+
+  normalize() {
+    let xyz = JSVec3.normalize(this.toArray());
+    this.x = xyz[0] ?? this.x;
+    this.y = xyz[1] ?? this.y;
+    this.z = xyz[2] ?? this.z;
+    return this;
+  }
+
+  negate() {
+    let xyz = JSVec3.negate(this.toArray());
+    this.x = xyz[0] ?? this.x;
+    this.y = xyz[1] ?? this.y;
+    this.z = xyz[2] ?? this.z;
+    return this;
+  }
+
+  /* Static Operations */
   static add(a: Vec3, b: Vec3): Vec3 {
     return Vec3.fromArray(JSVec3.add(a.toArray(), b.toArray()));
   }
@@ -112,27 +185,9 @@ export class Vec3 {
     return Vec3.fromArray(JSVec3.cross(a.toArray(), b.toArray()));
   }
 
-  length(): number {
-    return JSVec3.length(this.toArray());
-  }
-
-  normalize() {
-    let xyz = JSVec3.normalize(this.toArray());
-    this.x = xyz[0] ?? this.x;
-    this.y = xyz[1] ?? this.y;
-    this.z = xyz[2] ?? this.z;
-  }
-
   static lerp(a: Vec3, b: Vec3, t: number): Vec3 {
     let xyz = JSVec3.lerp(a.toArray(), b.toArray(), t);
     return new Vec3(xyz[0], xyz[1], xyz[2]);
-  }
-
-  negate() {
-    let xyz = JSVec3.negate(this.toArray());
-    this.x = xyz[0] ?? this.x;
-    this.y = xyz[1] ?? this.y;
-    this.z = xyz[2] ?? this.z;
   }
 
   static triangleNormal(p0: Vec3, p1: Vec3, p2: Vec3): Vec3 {
@@ -157,18 +212,47 @@ export class Vec4 {
     this.w = w;
   }
 
-  static fromArray(arr: any[]): Vec4 {
-    return new Vec4(arr[0], arr[1], arr[2], arr[3]);
-  }
-
-  toArray(): number[] {
-    return [this.x, this.y, this.z, this.w];
-  }
-
+  /* Object Meta */
   clone(): Vec4 {
     return Vec4.fromArray(JSVec4.clone(this.toArray()));
   }
 
+  static Zero(): Vec4 {
+    return new Vec4(0, 0, 0, 0);
+  }
+
+  // Converts a flat array of numbers to Vec4
+  static fromArray(arr: any[]): Vec4 {
+    return new Vec4(arr[0], arr[1], arr[2], arr[3]);
+  }
+
+  // Returns Vec4 as an array of numbers
+  toArray(): number[] {
+    return [this.x, this.y, this.z, this.w];
+  }
+
+  // Converts an array of Vec4 into a flat array of numbers
+  static flatArray(arr: Vec4[]): number[] {
+    return arr.flatMap(vec => vec.toArray());
+  }
+
+  // Converts an array of numbers into an array of Vec4
+  static fromList(list: number[] | Float32Array): Vec4[] {
+    let arr: Vec4[] = [];
+    for (let i = 0; i < list.length; i += 4) {
+      arr.push(new Vec4(
+        list[i]!,     // TODO: is there any way to do val ?? throw exception inline as in C#?
+        list[i + 1]!, // Also, there should be more safety here!
+        list[i + 2]!,
+        list[i + 3]!,
+      ));
+    }
+    return arr;
+  }
+
+  /* Object Operations & Properties */
+
+  /* Static Operations */
   static add(a: Vec4, b: Vec4): Vec4 {
     return Vec4.fromArray(JSVec4.add(a.toArray(), b.toArray()));
   }
@@ -203,6 +287,26 @@ export class Mat4 {
     this.arr = data;
   }
 
+  /* Object Meta */
+  clone(): Mat4 {
+    return new Mat4(JSMat4.clone(this.arr));
+  }
+
+  static Identity(): Mat4 {
+    return new Mat4(JSMat4.identity());
+  }
+
+  // Converts a flat array of numbers to Mat4
+  static fromArray(arr: number[]) {
+    return new Mat4(new Float32Array(arr));
+  }
+
+  // Returns Mat4 as an array of numbers
+  toArray(): number[] {
+    return [...this.arr];
+  }
+
+  /* Object Operations & Properties */
   getString(): string {
     let str: string = "";
     for (let i = 0; i < this.arr.length; i++) {
@@ -213,22 +317,16 @@ export class Mat4 {
     return str;
   }
 
-  static fromArray(arr: number[]) {
-    return new Mat4(new Float32Array(arr));
+  // Returns position as (X, Y, Z) vector.
+  getPosition() {
+    return new Vec3(
+      this.arr[3]  ?? 0,
+      this.arr[7]  ?? 0,
+      this.arr[11] ?? 0
+    );
   }
 
-  toArray(): number[] {
-    return [...this.arr];
-  }
-
-  static identity(): Mat4 {
-    return new Mat4(JSMat4.identity());
-  }
-
-  clone(): Mat4 {
-    return new Mat4(JSMat4.clone(this.arr));
-  }
-
+  /* Object Operations & Properties */
   static multiply(a: Mat4, b: Mat4): Mat4 {
     return new Mat4(JSMat4.multiply(a.arr, b.arr));
   }

@@ -1,9 +1,28 @@
+// External
+import {GUI, Controller} from "lil-gui";
+
+// Javascript
+import {createBuffer, writeBuffer} from "@/lib/webgpu/buffers";
+import {configureContext, getPreferredCanvasFormat} from "@/lib/webgpu/context";
 import {createShaderModule} from "@/lib/webgpu/shaders";
+import {createDepthTexture, createMultisampleColorTexture, loadTextureFromImageBitmap} from "@/lib/webgpu/texture";
+
+// TypeScript
+import {createCubeGeometry, createSphereGeometry} from "@/core/render/IndexedMesh.ts";
+import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math.ts"
+import {type IndexedMesh} from "@/core/render/IndexedMesh.ts"
+
+// Local
 import shaderCode from "./shaders.wgsl?raw";
+
+
+
+
+
+/*
+
 import {Camera} from "@/core/render/Camera";
 import {type RenderTick, renderTickEvent} from "@/core/render/Render"
-import {GUI, Controller} from "lil-gui";
-import {Entity} from "@/assignments/a2-transforms-camera/entity";
 import * as Mat4 from "@/lib/math/mat4";
 import {
   fromEulerZYX,
@@ -14,17 +33,7 @@ import {
   translate as matrixTranslate
 } from "@/lib/math/transforms";
 
-/*
-import {Renderer} from "@/core/render/Render";
-import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
-DEFAULT_MATERIAL.shader = ["DEFAULT", shaderCode];
-*/
 
-import {
-  generateGasket,
-} from "@/assignments/a3-sierpinski-gasket/tetrahedron";
-// import {Model} from "@/core/render/Model";
-import {configureContext} from "@/lib/webgpu/context";
 
 type PointerMovement = [x: number, y: number];
 type vec3 = [number, number, number];
@@ -331,3 +340,4 @@ function tick(data: RenderTick) {
 }
 
 void InitWebGPU();
+*/
