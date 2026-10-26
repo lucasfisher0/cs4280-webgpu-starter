@@ -14,7 +14,7 @@ export class Mesh implements Disposable {
   }
 
   isValid(): boolean {
-    return !(this.#isDisposed || !this.vertexBuffer || !this.vertexBuffer || !this.indexBuffer);
+    return !(this.#isDisposed || !this.vertexBuffer || !this.indexBuffer);
   }
 
   dispose(): void {

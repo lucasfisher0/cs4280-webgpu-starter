@@ -306,6 +306,11 @@ export class Mat4 {
     return [...this.arr];
   }
 
+  // Converts an array of Mat4 into a flat array of numbers
+  static flatArray(arr: Mat4[]): number[] {
+    return arr.flatMap(x => x.toArray());
+  }
+
   /* Object Operations & Properties */
   getString(): string {
     let str: string = "";
@@ -320,9 +325,9 @@ export class Mat4 {
   // Returns position as (X, Y, Z) vector.
   getPosition() {
     return new Vec3(
-      this.arr[3]  ?? 0,
-      this.arr[7]  ?? 0,
-      this.arr[11] ?? 0
+      this.arr[12]  ?? 0,
+      this.arr[13]  ?? 0,
+      this.arr[14] ?? 0
     );
   }
 

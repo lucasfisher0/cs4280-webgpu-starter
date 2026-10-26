@@ -7,13 +7,13 @@ import type {Mesh} from "@/core/render/Mesh.ts";
 
 export class ModelNode extends SceneNode {
   mesh: Mesh;
-  material: Material | null;
+  // material: Material | null;
 
   constructor(mesh: Mesh,
-              material: Material,
+              // material: Material,
               ...args: ConstructorParameters<typeof SceneNode>) {
     super(...args);
     this.mesh = mesh;
-    this.material = material;
+    // this.material = material;
   }
 }

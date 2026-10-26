@@ -17,7 +17,7 @@ export class OrbitCamera extends Camera {
     let origin: Mat4 = super.getWorldTransform();
     let tether: Mat4 = Mat4.multiply(
       Transform.fromEulerZYX(this.tetherRotation[0], this.tetherRotation[1], this.tetherRotation[2]),
-      Transform.translate(0, 0, -this.tetherDistance)
+      Transform.translate(0, 0, this.tetherDistance)
     );
 
     return Mat4.multiply(tether, origin);
@@ -33,6 +33,11 @@ export class OrbitCamera extends Camera {
   }
 
   override tick(data: TickData) {
+    const CAM_SENS = 0.05;
+    this.addRotation(
+      data.drag_movement[0] * CAM_SENS * data.deltaTime,
+      data.drag_movement[1] * CAM_SENS * data.deltaTime);
+
     if (this.spinEnabled)
       this.tetherRotation[0]! += this.spinSpeed * data.deltaTime;
   }

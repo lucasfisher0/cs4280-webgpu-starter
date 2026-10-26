@@ -1,6 +1,7 @@
+
 import {configureContext, getPreferredCanvasFormat} from "@/lib/webgpu/context";
 
-
+/*
 import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
 // import {Model} from "@/core/render/Model";
 import {createShaderModule} from "@/lib/webgpu/shaders";
@@ -225,3 +226,4 @@ export class Renderer implements Disposable {
     this.device.popErrorScope().then(e => e && console.error('Error on queue submission: ', e.message));
   }
 }
+*/
