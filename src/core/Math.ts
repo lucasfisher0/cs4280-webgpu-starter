@@ -391,7 +391,8 @@ export const Transform  = {
 
   // View Operations
   lookAt(_eye: Vec3, _target: Vec3, _up: Vec3): Mat4 {
-    return new Mat4(JSTransforms.lookAt(_eye, _target, _up));
+    return new Mat4(JSTransforms.lookAt(_eye.toArray(), _target.toArray(), _up.toArray()));
+
   },
   perspective(_fovYRadians: number, _aspect: number, _near: number, _far: number): Mat4 {
     return new Mat4(JSTransforms.perspective(_fovYRadians, _aspect, _near, _far));

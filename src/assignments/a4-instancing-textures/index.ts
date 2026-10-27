@@ -27,8 +27,8 @@ import {multiplyAll} from "@/lib/math/mat4";
 const gui = new GUI({container: document.getElementById('controlBox')!});
 
 const hallParams = {
-  width: 4,
-  length: 4,
+  width: 80,
+  length: 80,
   height: 4
 };
 
@@ -44,7 +44,7 @@ const params = {
   depth: 1,
   modelScale: 1,
   diffuse: {r: 1, g: 0, b: 1},
-  lightPosition: {x: 0, y: 0, z: 0},
+  lightPosition: {x: 0, y: 2, z: 0},
   lightStrength: 0.8,
   ambientStrength: 0.2,
   specularCoefficient: 0.8,
@@ -107,15 +107,18 @@ enum MATERIAL_INDEX {
 
 class InstancedModelNode extends ModelNode {
   material: MATERIAL_INDEX = 0;
+  isVisible: boolean = true;
 
   getInstanceData(): number[] {
-    return [...this.getWorldTransform().toArray(), this.material, 0, 0, 0];
+    return [...this.getWorldTransform().toArray(), this.material];//, 0, 0, 0];
   }
 }
 
 const scene = new SceneNode({name: "root"});
 const camera = new OrbitCamera({name: "Camera"});
+camera.clipFar = 500;
 scene.addChild(camera);
+
 
 async function InitWebGPU() {
   const adapter: GPUAdapter | null = await navigator.gpu.requestAdapter();
@@ -126,6 +129,14 @@ async function InitWebGPU() {
 
   // Canvas
   const canvas = document.getElementById("canvas")! as HTMLCanvasElement;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(canvas.clientWidth * dpr);
+  canvas.height = Math.floor(canvas.clientHeight * dpr);
+  canvas.addEventListener("resize", () => {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(canvas.clientWidth * dpr);
+    canvas.height = Math.floor(canvas.clientHeight * dpr);
+  });
   const abortController = new AbortController();
   canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId);
@@ -146,6 +157,9 @@ async function InitWebGPU() {
 
   // WebGPU Device
   const device = await adapter.requestDevice();
+  device.onuncapturederror = (event) => {
+    console.error("Uncaught WebGPU error:", event.error.message);
+  };
   const format = getPreferredCanvasFormat()
   const context = configureContext(canvas, device, format);
 
@@ -161,10 +175,11 @@ async function InitWebGPU() {
 
   // SceneGraph
   const floor = new InstancedModelNode(cubeMesh, {name: "Floor"});
+  floor.translation = Transform.translate(0, -0.05, 0);
   floor.material = MATERIAL_INDEX.Tile;
   scene.addChild(floor);
 
-  const walls: InstancedModelNode[] = [
+  let walls: InstancedModelNode[] = [
     new InstancedModelNode(cubeMesh, {name: "Wall1"}),
     new InstancedModelNode(cubeMesh, {name: "Wall2"}),
     new InstancedModelNode(cubeMesh, {name: "Wall3"}),
@@ -172,7 +187,26 @@ async function InitWebGPU() {
   ];
   walls.forEach(w => {w.material = MATERIAL_INDEX.Metal; scene.addChild(w)});
 
-  // TODO: Desks
+  function createDesk(): InstancedModelNode[] {
+    let top = new InstancedModelNode(cubeMesh, {name: "top"});
+    top.scale = Transform.scale(1.6, 0.05, 0.8);
+    top.translation = Transform.translate(0, 0.725,0);
+
+    let leg1 = new InstancedModelNode(cubeMesh, {name: "leg1"});
+    leg1.scale = Transform.scale(0.06, 0.70, 0.06);
+    leg1.translation = Transform.translate(0.8-0.08, 0.3625, 0.4-0.08);
+    let leg2 = new InstancedModelNode(cubeMesh, {name: "leg1"});
+    leg2.scale = Transform.scale(0.06, 0.70, 0.06);
+    leg2.translation = Transform.translate(0.8-0.08, 0.3625, -0.4+0.08);
+    let leg3 = new InstancedModelNode(cubeMesh, {name: "leg1"});
+    leg3.scale = Transform.scale(0.06, 0.70, 0.06);
+    leg3.translation = Transform.translate(-0.8+0.08, 0.3625, 0.4-0.08);
+    let leg4 = new InstancedModelNode(cubeMesh, {name: "leg1"});
+    leg4.scale = Transform.scale(0.06, 0.70, 0.06);
+    leg4.translation = Transform.translate(-0.8+0.08, 0.3625, -0.4+0.08);
+
+    return [top, leg1, leg2, leg3, leg4];
+  }
 
   // Uniform Buffer
   const UNIFORM_SIZE: number = 84 * 4;
@@ -185,11 +219,11 @@ async function InitWebGPU() {
   const u32 = new Uint32Array(uniformData);
 
   const FLOATS_PER_VERTEX = 6;
-  const FLOATS_PER_MATRIX = 16;
-  const MAX_COPIES = 40;
+  const FLOATS_PER_MATRIX = 17;
+  const MAX_COPIES = 1420;
   const SPHERES_PER_COPY = 5;
   const instanceBuffer = device.createBuffer({
-    size: MAX_COPIES * SPHERES_PER_COPY * FLOATS_PER_MATRIX * 4,
+    size: MAX_COPIES * 5 * FLOATS_PER_MATRIX * 4,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
   });
 
@@ -202,37 +236,25 @@ async function InitWebGPU() {
     },
       {
         binding: 1,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: {type: 'read-only-storage'}
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: {type: 'uniform'}
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: {type: 'uniform'}
       }]
   });
   const bindGroup = device.createBindGroup({
     label: "uniform-group",
     layout: bindGroupLayout,
     entries: [
-      {binding: 0, resource: {buffer: uniformBuffer}},{binding: 1, resource: {buffer: instanceBuffer}}]
+      {binding: 0, resource: {buffer: uniformBuffer}},
+      {binding: 0, resource: {buffer: uniformBuffer}},
+      {binding: 0, resource: {buffer: uniformBuffer}}]
   });
-
-  /*
-  const instanceGroupLayout = device.createBindGroupLayout({
-    label: "instance-layout",
-    entries: [{
-      binding: 0,
-      visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-      buffer: {type: 'read-only-storage'}
-    }]
-  });
-  const instanceBindGroup = device.createBindGroup({
-    label: "instance-group",
-    layout: instanceGroupLayout,
-    entries: [{binding: 0, resource: {buffer: instanceBuffer}}]
-  });
-  */
-
-
 
   const shaderModule = device.createShaderModule({code: shaderCode});
-
 
   const pipeline = device.createRenderPipeline({
     label: "pipeline",
@@ -250,10 +272,11 @@ async function InitWebGPU() {
         arrayStride: FLOATS_PER_MATRIX * 4,
         stepMode: 'instance',
         attributes: [
-          {shaderLocation: 3, offset: 0, format: 'float32x4'},  // column 0
-          {shaderLocation: 4, offset: 16, format: 'float32x4'}, // column 1
-          {shaderLocation: 5, offset: 32, format: 'float32x4'}, // column 2
-          {shaderLocation: 6, offset: 48, format: 'float32x4'}  // column 3
+          { shaderLocation: 2, offset: 0, format: 'float32x4' },  // column 0
+          { shaderLocation: 3, offset: 16, format: 'float32x4' }, // column 1
+          { shaderLocation: 4, offset: 32, format: 'float32x4' }, // column 2
+          { shaderLocation: 5, offset: 48, format: 'float32x4' }, // column 3
+          { shaderLocation: 6, offset: 64, format: 'float32' }  // material index
         ]
       }]
     },
@@ -262,25 +285,55 @@ async function InitWebGPU() {
       entryPoint: 'fragmentMain',
       targets: [{format}]
     },
-    primitive: {topology: 'triangle-list', cullMode: 'none'},
+    primitive: {topology: 'triangle-list', cullMode: 'back'},
     depthStencil: {format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less'}
   });
 
+  let desks = new SceneNode({name: "Desks"});
+  scene.addChild(desks);
+
   function updateScene() {
-    floor.scale = Transform.scale(hallParams.width, 1, hallParams.length);
-    for (let i = 0; i < 4; i++) {
-      let wall = walls[i]!;
-      if (i % 2 == 0) {
-        wall.scale = Transform.scale(1, hallParams.height, 1);
-        wall.translation = Transform.translate(0, hallParams.height / 2, 0);
-      }
-      else {
-        wall.scale = Transform.scale(1, hallParams.height, 1);
-        wall.translation = Transform.translate(0, hallParams.height / 2, 0);
-      }
+    floor.scale = Transform.scale(hallParams.width, 0.1, hallParams.length);
+
+    if (hallParams.height > 0)
+    {
+      walls[0]!.scale = Transform.scale(0.15, hallParams.height, hallParams.length);
+      walls[0]!.translation = Transform.translate((-hallParams.width+0.15) / 2, hallParams.height / 2, 0);
+      walls[1]!.scale = Transform.scale(0.15, hallParams.height, hallParams.length);
+      walls[1]!.translation = Transform.translate((hallParams.width-0.15) / 2, hallParams.height / 2, 0);
+      walls[2]!.scale = Transform.scale(hallParams.width, hallParams.height, 0.15);
+      walls[2]!.translation = Transform.translate(0, hallParams.height / 2, (-hallParams.length+0.15) / 2);
+      walls[3]!.scale = Transform.scale(hallParams.width, hallParams.height, 0.15);
+      walls[3]!.translation = Transform.translate(0, hallParams.height / 2, (hallParams.length-0.15) / 2);
+      walls.forEach(w => w.isVisible = true);
+    }
+    else
+      walls.forEach(w => w.isVisible = false);
+
+
+
+    desks.children = [];
+    let deskCount = 0;
+
+    let rowCount = 1 + Math.floor(((hallParams.width/2) - 1.2) / 2.4) * 2;
+    let colCount = 1 + Math.floor(((hallParams.length/2) - 1.2) / 1.8) * 2;
+
+    let xstart = ((rowCount-1) / 2) * -2.4;
+    let ystart = ((colCount-1) / 2) * -1.8;
+
+    for (let i = 0; i < rowCount * colCount; i++) {
+      const row = Math.floor(i / colCount)
+      const col = i % colCount;
+
+      const desk = new SceneNode({name: `Desk${++deskCount}`});
+      desk.translation = Transform.translate(
+        xstart + row * 2.4,
+        0,
+        ystart + col * 1.8);
+      desk.addChildren(createDesk());
+      desks.addChild(desk);
     }
   }
-
 
   let depthTexture: GPUTexture | null = null;
   function renderFrame() {
@@ -301,7 +354,6 @@ async function InitWebGPU() {
       });
     }
 
-
     // Uniform Buffer
     const view = camera.getViewMatrix();
     const a = canvas.clientWidth / canvas.clientHeight;
@@ -319,18 +371,16 @@ async function InitWebGPU() {
 
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
-
     // Instance Buffer
     const recurseInstances = (_node: SceneNode): number[][] => {
       let out: number[][] = [];
       _node.children.forEach((child) => out.push(...recurseInstances(child)));
-      if (_node instanceof InstancedModelNode)
+      if (_node instanceof InstancedModelNode && _node.isVisible)
         out.push(_node.getInstanceData());
       return out;
     }
-    const instanceList = recurseInstances(scene);
+    const instanceList = recurseInstances(scene);// [floor.getInstanceData()];
     device.queue.writeBuffer(instanceBuffer, 0, new Float32Array(instanceList.flat()));
-
 
     // Encoders
     const commandEncoder = device.createCommandEncoder({label: 'frame-encoder'});
@@ -355,7 +405,7 @@ async function InitWebGPU() {
     pass.setVertexBuffer(0, cubeMesh.vertexBuffer);
     pass.setVertexBuffer(1, instanceBuffer);
     pass.setIndexBuffer(cubeMesh.indexBuffer, cubeMesh.indexFormat);
-    pass.drawIndexed(cubeMesh.indexCount, instanceList.length);
+    pass.drawIndexed(cubeMesh.indexCount, instanceList.length, 0, 0, 0);
 
     pass.end();
     device.queue.submit([commandEncoder.finish()])

@@ -3,7 +3,6 @@ const PI = 3.14159265359;
 struct Uniforms {
     viewMatrix: mat4x4<f32>,
     projectionMatrix: mat4x4<f32>,
-    // normalMatrix : mat4x4<f32>,
     cameraPosition : vec3<f32>,
     ambientStrength: f32,
     lightPosition: vec4<f32>,     // RGB, Alpha is strength
@@ -13,63 +12,59 @@ struct Uniforms {
     _pad0: vec3<f32>
 };
 
-struct Instance {
-    model: mat4x4<f32>,
-    material: f32,
-    _pad0: vec3<f32>
-};
-
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var<storage, read> instanceArray: array<Instance>;
-//@group(0) @binding(1) var diffuse_texture: texture_2d<f32>;
-//@group(0) @binding(2) var texture_sampler: sampler;
-
-
+@group(0) @binding(1) var diffuse_textures: texture_2d_array<f32>;
+@group(0) @binding(2) var texture_sampler: sampler;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
 
-
-
-    @builtin(instance_index) instanceIdx: u32,
-    // @location(2) uv: vec2<f32>,
+    // per-instance matrix, delivered as its 4 columns
+    @location(2) m0 : vec4<f32>,
+    @location(3) m1 : vec4<f32>,
+    @location(4) m2 : vec4<f32>,
+    @location(5) m3 : vec4<f32>,
+    @location(6) mIndex: f32,
+    @builtin(instance_index) iid : u32,
 };
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) normal: vec3<f32>,
     @location(1) worldPosition: vec3<f32>,
-    // @location(2) uv: vec2<f32>,
+    @location(2) uv: vec2<f32>,
+    @location(3) mIndex: f32,
 };
 
 @vertex
 fn vertexMain(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    let instance = instanceArray[in.instanceIdx];
+    let instance = mat4x4<f32>(in.m0, in.m1, in.m2, in.m3);
 
-    let worldPosition = instance.model[in.instanceIdx] * vec4<f32>(in.position, 1.0);
+    let worldPosition = instance * vec4<f32>(in.position, 1.0);
     out.worldPosition = worldPosition.xyz;
 
     out.position = uniforms.projectionMatrix * uniforms.viewMatrix * worldPosition;
 
-    let sx = instance.model[0][0];
-    let sy = instance.model[1][1];
-    let sz = instance.model[2][2];
+    let sx = in.m0[0];
+    let sy = in.m1[1];
+    let sz = in.m2[2];
 
     let n = vec3<f32>(
         in.normal.x / (sx*sx),
         in.normal.y / (sy*sy),
         in.normal.z / (sz*sz));
 
-    out.normal = (instance.model * vec4f(n, 0.0)).xyz;
+    out.normal = (instance * vec4f(n, 0.0)).xyz;
+    out.uv = vec2<f32>(1.0, 1.0);
+    out.mIndex = in.mIndex;
     return out;
 }
 
 @fragment
 fn fragmentMain(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(1.0, 1.0, 1.0, 1.0);
     let texColor = vec4<f32>(uniforms.diffuse, 1.0);
-    // let texColor = textureSample(diffuse_texture, texture_sampler, in.uv);
+    // let texColor = textureSample(diffuse_texture, texture_sampler, in.uv, in.mIndex);
     let ambient: vec3<f32> = vec3<f32>(1.0, 1.0, 1.0) * uniforms.ambientStrength * texColor.rgb;
 
     // Diffuse

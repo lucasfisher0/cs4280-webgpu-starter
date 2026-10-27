@@ -1,4 +1,4 @@
-import { lookAt } from "@/lib/math/transforms.js";
+import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math.ts"
 
 /**
  * Custom camera class to encapsulate all behavior, such as positioning and controls.
@@ -13,16 +13,16 @@ export class Camera {
   verticalFov: number = 1.0472; // 60 deg, vertical FoV
 
   /** Camera position derived from tether distance + yaw/pitch. */
-  getPosition(): Float32Array {
+  getPosition(): Vec3 {
     const yaw: number = this.rotation[0] ?? 0;
     const pitch: number = this.rotation[1] ?? 0;
     const r = this.tetherDistance;
 
-    return new Float32Array([
+    return new Vec3(
       r * Math.cos(pitch) * Math.sin(yaw),
       r * Math.sin(pitch),
       r * Math.cos(pitch) * Math.cos(yaw)
-    ]);
+    );
   }
 
   addRotation(yaw: number, pitch: number) {
@@ -37,13 +37,13 @@ export class Camera {
       this.rotation[1] = DEG_89 * Math.sign(this.rotation[1]!);
   }
 
-  getViewMatrix(target?: Float32Array) {
-    target ??= new Float32Array([0, 0, 0]);
+  getViewMatrix(target?: Vec3) {
+    target ??= Vec3.Zero();
 
-    return lookAt(
+    return Transform.lookAt(
       this.getPosition(),
       target,
-      new Float32Array([0, 1, 0]),
+      new Vec3(0, 1, 0)
     );
   }
 

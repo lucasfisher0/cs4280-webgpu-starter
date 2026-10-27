@@ -38,6 +38,13 @@ export class SceneNode {
     return child;
   }
 
+  addChildren(childen: SceneNode[]) {
+    childen.forEach(child => {
+      this.children.push(child);
+      child.parent = this;
+    });
+  }
+
   /** Finds the first descendant (or this node) with the given `name`, or `null`. */
   find(name: string): SceneNode | null {
     if (this.name === name)
@@ -62,6 +69,7 @@ export class SceneNode {
   /** Returns composed TRS matrix in local-space. **/
   getTransformMatrix(): Mat4 {
     return Mat4.multiplyAll([this.translation, this.rotation, this.scale]);
+    //return Mat4.multiplyAll([this.scale, this.rotation, this.translation]);
   }
 
   tick(data: TickData): void {
