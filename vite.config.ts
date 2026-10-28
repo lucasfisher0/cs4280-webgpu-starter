@@ -27,6 +27,7 @@ const pages = [
   "activities/snowmen-canvas-texture/index.html",
   "activities/globe/index.html",
   "activities/sierpinski/index.html",
+  "activities/splines/index.html",
 ];
 
 // https://vite.dev/config/

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebGPU Spline Segments</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-zinc-800 min-h-screen flex flex-col items-center p-6 font-sans">
+  <header class="text-center mb-4">
+    <h1 class="text-2xl font-bold text-white">WebGPU Spline Segments</h1>
+    <p class="text-xs text-zinc-400 mt-1">One vertex shader evaluates every cubic spline as
+      f(u) = [1 u u² u³] B p; only B and the gather rule change</p>
+  </header>
+
+  <main class="w-full max-w-2xl border border-zinc-800 rounded-xl overflow-hidden shadow-2xl relative">
+    <div class="relative aspect-[16/10] bg-black">
+      <canvas id="gpu-canvas" class="w-full h-full touch-none cursor-crosshair block"></canvas>
+    </div>
+
+    <div class="flex justify-between items-center px-4 py-2 border-t border-zinc-800 text-xs text-zinc-500">
+      <span>Drag a point to move it · click empty space to add one · shift-click to remove</span>
+      <span id="fps-label">FPS: --</span>
+    </div>
+  </main>
+
+  <pre id="info" class="w-full max-w-2xl mt-4 p-4 rounded-xl bg-zinc-900 text-xs text-zinc-300 whitespace-pre-wrap"></pre>
+
+  <script type="module">
+    import { initializeWebGPU, animate } from "./webgpu.js";
+    import GUI from "lil-gui";
+
+    // Evaluating a spline segment (m09 slides):
+    //   1. Gather the segment's four control values p.  <- only this step depends on the spline type
+    //   2. Weigh:  b(u) = [1 u u² u³] B
+    //   3. Blend:  f(u) = b0 p0 + b1 p1 + b2 p2 + b3 p3
+    // Step 1 runs here on the CPU. Steps 2 and 3 run in the vertex shader,
+    // one instance per segment.
+    //
+    // Everything except the TODOs is done: the buffers, pipelines, controls,
+    // point editing, and drawing. Until the TODOs are filled in, no curve
+    // appears; the info panel shows the current B and segment count.
+
+    const MAX_POINTS = 64;
+    const MAX_SEGMENTS = 64;
+
+    // --- Basis matrices B (rows multiply 1, u, u², u³) ------------------
+    // Each is a 4x4 array of rows: B[r][k] is the coefficient of u^r in the
+    // blending function b_k(u). The zeros are placeholders.
+
+    // TODO: the cubic Bézier basis matrix (slide "The Cubic Bézier Basis").
+    const BEZIER_B = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+
+    // TODO: the Hermite basis matrix, for control values f(0), f'(0), f(1), f'(1)
+    // (slide "Hermite Cubics").
+    const HERMITE_B = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+
+    // TODO: the uniform cubic B-spline basis matrix (slide "Uniform Cubic B-Splines").
+    const BSPLINE_B = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+
+    // TODO: the cardinal basis matrix for tension τ, with s = (1 − τ) / 2
+    // (slides "Cardinal Splines" and "Catmull–Rom Splines"). τ = 0 gives Catmull–Rom.
+    function cardinalB(tension) {
+      return [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+    }
+
+    // --- Gather rules: the user's points P -> a list of 4-value segments ---
+    // P is an array of [x, y] points. Each gather function returns an array
+    // of segments, and each segment is an array of four [x, y] control
+    // values, in the order the basis matrix expects them. The rule text in
+    // SPLINES below (also shown in the info panel) says what each one gathers.
+    const wrap = (i, n) => ((i % n) + n) % n;                 // closed: indices wrap around
+    const clamp = (i, n) => Math.min(n - 1, Math.max(0, i));  // open: repeat the end points
+
+    // TODO: Bézier. Segment i uses P[3i] ... P[3i+3]; neighbors share an end
+    // point (slide "Joining Bézier Segments"). Make as many whole segments as P allows.
+    function gatherBezier(P) {
+      const segments = [];
+      return segments;
+    }
+
+    // TODO: Hermite. The points come in pairs: an anchor P[2j], then a handle
+    // P[2j+1] whose velocity is v = 3 (handle − anchor). Segment i runs from
+    // anchor 2i to anchor 2i+2, with control values: anchor, its velocity,
+    // the next anchor, its velocity. Ignore an unpaired last point.
+    function gatherHermite(P) {
+      const segments = [];
+      return segments;
+    }
+
+    // TODO: cardinal / Catmull–Rom. The segment from P[i] to P[i+1] uses
+    // P[i−1], P[i], P[i+1], P[i+2]. An open path has n − 1 segments and
+    // repeats its end points (clamp); a closed path has n segments and
+    // wraps the indices (wrap).
+    function gatherCardinal(P, closed) {
+      const segments = [];
+      return segments;
+    }
+
+    // TODO: uniform cubic B-spline. Segment i uses P[i] ... P[i+3]. An open
+    // path has n − 3 segments; a closed path has n and wraps the indices.
+    function gatherBSpline(P, closed) {
+      const segments = [];
+      return segments;
+    }
+
+    const SPLINES = {
+      "Bézier": {
+        basis: () => BEZIER_B, gather: gatherBezier, polygon: "strip", closable: false,
+        rule: "segment i: P[3i], P[3i+1], P[3i+2], P[3i+3]  (neighbors share an end point)"
+      },
+      "Hermite": {
+        basis: () => HERMITE_B, gather: gatherHermite, polygon: "pairs", closable: false,
+        rule: "points come in pairs (anchor, handle); v = 3 (handle − anchor)\nsegment i: P[2i], v[2i], P[2i+2], v[2i+2]"
+      },
+      "Cardinal / Catmull–Rom": {
+        basis: (state) => cardinalB(state.tension), gather: gatherCardinal, polygon: "strip", closable: true,
+        rule: "segment i (from P[i] to P[i+1]): P[i−1], P[i], P[i+1], P[i+2]\nopen: repeat the end points; closed: wrap the indices"
+      },
+      "Uniform cubic B-spline": {
+        basis: () => BSPLINE_B, gather: gatherBSpline, polygon: "strip", closable: true,
+        rule: "segment i: P[i], P[i+1], P[i+2], P[i+3]\nclosed: wrap the indices"
+      }
+    };
+
+    // World space: y spans [-1, 1], x spans [-aspect, aspect].
+    const DEFAULT_POINTS = [[-1.25, -0.5], [-0.9, 0.45], [-0.4, 0.6], [0.0, -0.1], [0.45, -0.6], [0.9, -0.2], [1.2, 0.55]];
+
+    const state = {
+      type: "Cardinal / Catmull–Rom",
+      tension: 0,
+      closed: false,
+      samples: 32,
+      showPolygon: true,
+      points: DEFAULT_POINTS.map((p) => [...p]),
+      resetPoints() { state.points = DEFAULT_POINTS.map((p) => [...p]); }
+    };
+
+    const gui = new GUI({ title: "Controls" });
+    gui.add(state, "type", Object.keys(SPLINES)).name("Spline Type");
+    gui.add(state, "tension", -0.5, 0.95, 0.05).name("Tension τ (Cardinal)");
+    gui.add(state, "closed").name("Closed (Cardinal, B-spline)");
+    gui.add(state, "samples", 1, 64, 1).name("Samples per Segment");
+    gui.add(state, "showPolygon").name("Show Control Polygon");
+    gui.add(state, "resetPoints").name("Reset Points");
+
+    const wgslSource = `
+      struct Params {
+        B : mat4x4f,        // the basis matrix, uploaded row by row (see vs_curve)
+        samples : u32,      // byte offset 64
+        pointCount : u32,   // byte offset 68
+        aspect : f32,       // byte offset 72
+      };                    // 76 bytes, rounded up to 80
+      @group(0) @binding(0) var<uniform> params : Params;
+      @group(0) @binding(1) var<storage, read> control : array<vec2f>;   // 4 control values per segment
+      @group(0) @binding(2) var<storage, read> points : array<vec2f>;    // the points the user drags
+
+      struct VSOut {
+        @builtin(position) position : vec4f,
+        @location(0) color : vec3f,
+      };
+
+      // World (x in [-aspect, aspect], y in [-1, 1]) to clip space.
+      fn toClip(p : vec2f) -> vec4f {
+        return vec4f(p.x / params.aspect, p.y, 0.0, 1.0);
+      }
+
+      @vertex
+      fn vs_curve(@builtin(vertex_index) i : u32, @builtin(instance_index) seg : u32) -> VSOut {
+        // 1. Gather: this segment's four control values (gathered on the CPU).
+        let p0 = control[4u * seg];
+        let p1 = control[4u * seg + 1u];
+        let p2 = control[4u * seg + 2u];
+        let p3 = control[4u * seg + 3u];
+
+        // TODO 2. Weigh: compute the parameter u for this vertex (sample i of
+        // params.samples), the vector U = [1 u u² u³], and the blending
+        // weights b = U B. Careful: WGSL matrices are column-major, and B was
+        // uploaded row by row (see onFrame), so params.B holds Bᵀ. Which
+        // product, params.B * U or U * params.B, gives U B?
+
+        // TODO 3. Blend: f = b0 p0 + b1 p1 + b2 p2 + b3 p3.
+        let f = p0;   // placeholder: replace with the blend
+
+        var out : VSOut;
+        out.position = toClip(f);
+        out.color = select(vec3f(1.0, 0.6, 0.2), vec3f(0.3, 0.8, 0.9), (seg & 1u) == 1u);   // alternate per segment
+        return out;
+      }
+
+      @vertex
+      fn vs_polygon(@builtin(vertex_index) i : u32) -> VSOut {
+        var out : VSOut;
+        out.position = toClip(points[i % params.pointCount]);   // % closes the loop
+        out.color = vec3f(0.45);
+        return out;
+      }
+
+      @vertex
+      fn vs_point(@builtin(vertex_index) i : u32, @builtin(instance_index) k : u32) -> VSOut {
+        let corner = vec2f(f32(i & 1u), f32(i >> 1u)) * 2.0 - 1.0;   // a quad as a 4-vertex strip
+        var out : VSOut;
+        out.position = toClip(points[k] + 0.015 * corner);
+        out.color = vec3f(0.95);
+        return out;
+      }
+
+      @fragment
+      fn fs_main(@location(0) color : vec3f) -> @location(0) vec4f {
+        return vec4f(color, 1.0);
+      }
+    `;
+
+    async function init() {
+      try {
+        const { canvas, device, context, format } = await initializeWebGPU('gpu-canvas');
+
+        const UNIFORM_SIZE = 80;
+        const uniformData = new ArrayBuffer(UNIFORM_SIZE);
+        const f32 = new Float32Array(uniformData);
+        const u32 = new Uint32Array(uniformData);
+        const uniformBuffer = device.createBuffer({ size: UNIFORM_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        const controlData = new Float32Array(MAX_SEGMENTS * 4 * 2);
+        const controlBuffer = device.createBuffer({ size: controlData.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+        const pointData = new Float32Array(MAX_POINTS * 2);
+        const pointBuffer = device.createBuffer({ size: pointData.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+
+        const bindGroupLayout = device.createBindGroupLayout({
+          entries: [
+            { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
+            { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
+            { binding: 2, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } }
+          ]
+        });
+        const bindGroup = device.createBindGroup({
+          layout: bindGroupLayout,
+          entries: [
+            { binding: 0, resource: { buffer: uniformBuffer } },
+            { binding: 1, resource: { buffer: controlBuffer } },
+            { binding: 2, resource: { buffer: pointBuffer } }
+          ]
+        });
+
+        // One shader module, one pipeline per (vertex entry point, topology).
+        // None has a vertex buffer: everything comes from the storage buffers.
+        const shaderModule = device.createShaderModule({ code: wgslSource });
+        const layout = device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+        const makePipeline = (entryPoint, topology) => device.createRenderPipeline({
+          layout,
+          vertex: { module: shaderModule, entryPoint },
+          fragment: { module: shaderModule, entryPoint: 'fs_main', targets: [{ format }] },
+          primitive: { topology },
+          // animate() always attaches a depth buffer, so the pipeline must declare one.
+          depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' }
+        });
+        const curvePipeline = makePipeline('vs_curve', 'line-strip');
+        const stripPipeline = makePipeline('vs_polygon', 'line-strip');
+        const pairsPipeline = makePipeline('vs_polygon', 'line-list');
+        const pointPipeline = makePipeline('vs_point', 'triangle-strip');
+
+        // --- Dragging, adding, and removing points -----------------------
+        const toWorld = (e) => {
+          const rect = canvas.getBoundingClientRect();
+          const aspect = rect.width / rect.height;
+          return [(((e.clientX - rect.left) / rect.width) * 2 - 1) * aspect, 1 - ((e.clientY - rect.top) / rect.height) * 2];
+        };
+        const nearestPoint = ([x, y]) => {
+          let best = -1, bestDist = 0.05;                   // pick radius in world units
+          state.points.forEach(([px, py], k) => {
+            const d = Math.hypot(px - x, py - y);
+            if (d < bestDist) { best = k; bestDist = d; }
+          });
+          return best;
+        };
+        let dragging = -1;
+        canvas.addEventListener('pointerdown', (e) => {
+          const p = toWorld(e), k = nearestPoint(p);
+          if (k >= 0 && e.shiftKey) {
+            state.points.splice(k, 1);
+          } else if (k >= 0) {
+            dragging = k;
+          } else if (state.points.length < MAX_POINTS) {
+            state.points.push(p);
+            dragging = state.points.length - 1;
+          }
+          if (dragging >= 0) canvas.setPointerCapture(e.pointerId);
+        });
+        canvas.addEventListener('pointermove', (e) => {
+          if (dragging >= 0) state.points[dragging] = toWorld(e);
+        });
+        const stopDrag = () => { dragging = -1; };
+        canvas.addEventListener('pointerup', stopDrag);
+        canvas.addEventListener('pointercancel', stopDrag);
+
+        // --- The info panel: the current B and gather rule ----------------
+        const info = document.getElementById('info');
+        const formatMatrix = (B) => B.map((row) => row.map((v) => (Math.abs(v) < 1e-9 ? 0 : v).toFixed(3).padStart(7)).join(' ')).join('\n');
+        let lastInfo = '';
+
+        animate({
+          canvas,
+          device,
+          context,
+          fpsElementId: 'fps-label',
+          onFrame: ({ renderPass, aspect }) => {
+            const spline = SPLINES[state.type];
+            const B = spline.basis(state);
+            const P = state.points;
+
+            // 1. Gather (CPU). Only this step and B depend on the spline type.
+            const segments = spline.gather(P, state.closed).slice(0, MAX_SEGMENTS);
+            segments.forEach((seg, i) => {
+              controlData.set(seg.flat(), 8 * i);
+            });
+            device.queue.writeBuffer(controlBuffer, 0, controlData);
+            pointData.set(P.flat(), 0);
+            device.queue.writeBuffer(pointBuffer, 0, pointData);
+
+            f32.set(B.flat(), 0);                  // floats 0-15, row by row
+            u32[16] = state.samples;               // byte 64, a u32
+            u32[17] = Math.max(1, P.length);       // byte 68, a u32
+            f32[18] = aspect;                      // byte 72
+            device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+            const text = `${state.type}: ${segments.length} segment(s) from ${P.length} point(s)\n\nB =\n${formatMatrix(B)}\n\n${spline.rule}`;
+            if (text !== lastInfo) { info.textContent = text; lastInfo = text; }
+
+            renderPass.setBindGroup(0, bindGroup);
+            if (state.showPolygon && P.length >= 2) {
+              if (spline.polygon === 'pairs') {
+                renderPass.setPipeline(pairsPipeline);
+                renderPass.draw(P.length - (P.length % 2));            // anchor-handle pairs
+              } else {
+                renderPass.setPipeline(stripPipeline);
+                renderPass.draw(P.length + (state.closed && spline.closable ? 1 : 0));   // +1 returns to P[0]
+              }
+            }
+            // 2-3. Weigh and blend (GPU): samples + 1 vertices per segment, one instance per segment.
+            renderPass.setPipeline(curvePipeline);
+            renderPass.draw(state.samples + 1, segments.length);
+            renderPass.setPipeline(pointPipeline);
+            renderPass.draw(4, P.length);
+          }
+        });
+      } catch (err) {
+        console.error("WebGPU Initialization Error:", err);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+
+</html>
