@@ -1,4 +1,8 @@
-import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math.ts"
+import {Vec2} from "@/core/math/Vec2.ts";
+import {Vec3} from "@/core/math/Vec3.ts";
+import {Vec4} from "@/core/math/Vec4.ts";
+import {Mat4} from "@/core/math/Mat4.ts";
+import * as Transform from "@/core/math/Transform.ts";
 import * as JSGeometry from "@/lib/webgpu/geometry";
 import {Mesh} from "@/core/render/Mesh.ts";
 import {createBuffer} from "@/lib/webgpu/buffers";

@@ -19,22 +19,24 @@
     "ci": "npm run lint && npm run build",
     "test": "vitest"
   },
+  "//disabled": {
+    "typegpu": "^0.12.6"
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.5.4",
     "@types/node": "^22.20.3",
     "@types/web": "^0.0.356",
     "jsdom": "^30.0.1",
     "lil-gui": "^0.21.0",
-    "typegpu": "^0.12.6",
     "typescript": "~6.0.2",
-    "vite": "^8.3.0",
-    "vitest": "^5.0.0"
+    "vite": "8.3.3",
+    "vitest": "5.0.5"
   },
   "allowScripts": {
     "fsevents@2.3.3": true
   },
   "dependencies": {
     "lil-gui": "^0.21.0",
-    "vite": "^8.1.4"
+    "vite": "8.3.3"
   }
 }

@@ -10,7 +10,11 @@ import {createShaderModule} from "@/lib/webgpu/shaders";
 import {createDepthTexture, createMultisampleColorTexture, loadTextureFromImageBitmap} from "@/lib/webgpu/texture";
 
 // TypeScript
-import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math.ts"
+import {Vec2} from "@/core/math/Vec2.ts";
+import {Vec3} from "@/core/math/Vec3.ts";
+import {Vec4} from "@/core/math/Vec4.ts";
+import {Mat4} from "@/core/math/Mat4.ts";
+import * as Transform from "@/core/math/Transform.ts";
 import {createCubeGeometry, createSphereGeometry, type IndexedMesh} from "./IndexedMesh.ts";
 import {OrbitCamera} from "@/core/render/OrbitCamera.ts";
 

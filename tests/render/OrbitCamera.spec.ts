@@ -1,9 +1,13 @@
 import {describe, expect, test} from "vitest";
-import {Vec2, Vec3, Vec4, Mat4, Transform} from "@/core/Math"
+import {Vec2} from "@/core/math/Vec2";
+import {Vec3} from "@/core/math/Vec3";
+import {Vec4} from "@/core/math/Vec4";
+import {Mat4} from "@/core/math/Mat4";
+import * as Transform from "@/core/math/Transforms"
 import {OrbitCamera} from "@/core/render/OrbitCamera";
 
 test("translate", () => {
-  let cam = new OrbitCamera()
+  let cam = new OrbitCamera({name: "Camera"});
 
 
   // Assignment 2 feedback:

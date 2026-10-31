@@ -56,7 +56,8 @@
     "./src",
   ],
   "exclude": [
-    "./src/tests",
+    "./src/deprecated",
+    "./tests",
     "./node_modules",
     "./dist"
   ]
