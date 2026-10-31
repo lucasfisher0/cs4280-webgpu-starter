@@ -50,7 +50,7 @@
     "noPropertyAccessFromIndexSignature": true,
 
     // Check if these are needed:
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": false
   },
   "include": [
     "./src",

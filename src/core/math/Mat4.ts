@@ -28,12 +28,13 @@ export class Mat4 {
     return [...this.arr];
   }
 
-  // Converts an array of Mat4 into a flat array of numbers
+  /** Converts an array of `Mat4` into a flat array of numbers. */
   static flatArray(arr: Mat4[]): number[] {
     return arr.flatMap(x => x.toArray());
   }
 
   /* Object Operations & Properties */
+  // TODO: Merge this with the debug stringify.
   getString(): string {
     let str: string = "";
     for (let i = 0; i < this.arr.length; i++) {
@@ -44,38 +45,45 @@ export class Mat4 {
     return str;
   }
 
-  // Returns position as (X, Y, Z) vector.
-  getPosition() {
-    return new Vec3(
-      this.arr[12]  ?? 0,
-      this.arr[13]  ?? 0,
-      this.arr[14] ?? 0
-    );
-  }
-
+  /** Transforms a `Vec3` point (implicit `w = 1`) by `m`, returning the full `Vec4` quadruple *before* any perspective divide. */
   transformPoint(p: Vec3): Mat4 {
     return Mat4.fromArray(JSMat4.transformPoint(this.toArray(), p.toArray()));
   }
 
   // perspectiveDivide implemented in Vec4.
 
+  /** Returns the transpose of the matrix. */
   transpose(): Mat4 {
     return new Mat4(JSMat4.transpose(this.toArray()));
   }
 
+  /**
+   * General 4x4 inverse via Gauss-Jordan elimination with partial pivoting.
+   * Throws if `m` is singular (or numerically too close to singular).
+   * Used for normal matrices (`transpose(invert(modelMatrix))`) and similar —
+   * a generic linear-algebra tool, not itself a "graphics algorithm".
+   */
   invert(): Mat4 {
     return new Mat4(JSMat4.invert(this.toArray()));
   }
 
+  /** Applies a matrix transformation to an existing matrix. */
+  multiply(a: Mat4): Mat4 {
+    return new Mat4(JSMat4.multiply(a.arr, this.arr));
+  }
+
   /* Static Operations & Properties */
+  /** Returns `a * b` (column-vector convention: `(a * b) * v === a * (b * v)`). */
   static multiply(a: Mat4, b: Mat4): Mat4 {
     return new Mat4(JSMat4.multiply(a.arr, b.arr));
   }
 
+  /** Transforms a homogeneous `[x, y, z, w]` vector by `m`. */
   static multiplyVec4(m: Mat4, v: Vec4): Vec4 {
     return Vec4.fromArray(JSMat4.multiplyVec4(m.toArray(), v.toArray()));
   }
 
+  /** Left-to-right `reduce` of `multiply` over a list of matrices. */
   static multiplyAll(matrices: Mat4[]): Mat4 {
     return Mat4.fromArray(JSMat4.multiplyAll(
       matrices.map((m: Mat4) => m.toArray())

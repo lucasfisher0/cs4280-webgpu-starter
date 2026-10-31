@@ -3,12 +3,12 @@ import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
 import * as Transform from "@/core/math/Transform.ts"
-import * as JSSceneNode from "@/lib/scenegraph/SceneNode.js"
 
 let nodeCount: number = 0;
 
 interface SceneNodeDescriptor {
-  name: string;
+  name?: string | null;
+  transform?: Mat4 | null;
   translation?: Mat4 | null;
   rotation?: Mat4 | null;
   scale?: Mat4 | null;
@@ -21,18 +21,25 @@ export type {SceneNodeDescriptor};
 export class SceneNode {
   readonly guid: string = crypto.randomUUID();
   name: string;
-  translation: Mat4;
-  rotation: Mat4;
-  scale: Mat4;
+  _localTransform: Mat4;
+  _worldTransform: Mat4;
+  #transformDirty: boolean = true;
   children: SceneNode[] = [];
   parent: SceneNode | null = null;
 
   constructor(desc: SceneNodeDescriptor) {
-    this.name = desc.name ?? `node_${nodeCount}`;
-    this.translation = desc.translation ?? Transform.translate(0, 0, 0);
-    this.rotation = desc.rotation ?? Mat4.Identity();
-    this.scale = desc.scale ?? Transform.scale(1, 1, 1);
-    nodeCount++;
+    this.name = desc.name ?? `node_${nodeCount++}`;
+
+    if (desc.transform)
+      this._localTransform = desc.transform;
+    else
+      this._localTransform = Mat4.multiplyAll([
+        desc.translation ?? Transform.translate(0, 0, 0),
+        desc.rotation ?? Mat4.Identity(),
+        desc.scale ?? Transform.scale(1, 1, 1)
+      ]);
+
+    this._worldTransform = this._localTransform;
   }
 
   /** Adds child to this node. **/
@@ -41,7 +48,7 @@ export class SceneNode {
     child.parent = this;
     return child;
   }
-
+  /** Adds multiple children to this node. **/
   addChildren(childen: SceneNode[]) {
     childen.forEach(child => {
       this.children.push(child);
@@ -49,12 +56,15 @@ export class SceneNode {
     });
   }
 
-  /** Finds the first descendant (or this node) with the given `name`, or `null`. */
-  find(name: string): SceneNode | null {
-    if (this.name === name)
+  /** Finds the first descendant (or this node) with the given name or guid. */
+  find(name?: string, guid?: string): SceneNode | null {
+    if (!name && !guid)
+      throw new Error("SceneNode: Find was called with a provided name or guid!");
+
+    if ((name && this.name === name) || (guid && this.guid === guid))
       return this;
     for (const child of this.children) {
-      const found = child.find(name);
+      const found = child.find(name, guid);
       if (found)
         return found;
     }
@@ -62,18 +72,28 @@ export class SceneNode {
     return null;
   }
 
-  /** Applies all parent transformations. **/
-  getWorldTransform(): Mat4 {
+  // Transforms
+  public get transform(): Mat4 { return this._localTransform; };
+  public set transform(transform: Mat4) { this._localTransform = transform; this.#transformDirty = true; }
+  public get worldTransform(): Mat4 { return this._worldTransform; };
+  public set worldTransform(transform: Mat4) {
     if (this.parent)
-      return Mat4.multiply(this.parent.getTransformMatrix(), this.getTransformMatrix());
+      transform = transform.multiply(this.parent.worldTransform.invert());
+    this._localTransform = transform;
+    this.#transformDirty = true;
+  };
 
-    return this.getTransformMatrix();
-  }
+  updateWorldTransform(parentWorldTransform: Mat4 = Mat4.Identity()) {
+    if (this.parent)
+      this._worldTransform = Mat4.multiply(this.parent.worldTransform, this._localTransform);
 
-  /** Returns composed TRS matrix in local-space. **/
-  getTransformMatrix(): Mat4 {
-    return Mat4.multiplyAll([this.translation, this.rotation, this.scale]);
-    //return Mat4.multiplyAll([this.scale, this.rotation, this.translation]);
+    if (!this.#transformDirty)
+      return;
+
+    for (const child of this.children)
+      child.updateWorldTransform(this._worldTransform);
+
+    this.#transformDirty = false;
   }
 
   tick(data: TickData): void {

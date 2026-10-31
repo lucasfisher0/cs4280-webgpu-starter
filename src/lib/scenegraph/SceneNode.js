@@ -30,23 +30,18 @@ export class SceneNode {
     this.localTransform = matrix;
   }
 
-  /**
-   * Updates the world transforms for this node and all descendants.
-   */
+  /** Updates the world transforms for this node and all descendants. */
   updateWorldTransforms(_parentWorldTransform = mat4.identity()) {
-    this.worldTransform = mat4.multiply(this.localTransform, _parentWorldTransform);
     for (const child of this.children) {
       child.updateWorldTransforms(this.worldTransform);
     }
   }
 
-  /**
-   * TODO: a depth-first visit of this node and every descendant — call
-   * `visit(node)` for this node, then recurse into each child. Call after
-   * `updateWorldTransforms()`.
-   */
+  /** Calls given visit function for node and all children. */
   traverse(_visit) {
-    throw new Error("SceneNode.traverse: not implemented");
+    _visit(this);
+    for (const child of this.children)
+      _visit(child);
   }
 
   /** Finds the first descendant (or this node) with the given `name`, or `null`. */

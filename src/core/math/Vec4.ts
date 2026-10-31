@@ -79,7 +79,7 @@ export class Vec4 {
     return new Vec4(arr[0], arr[1], arr[2], arr[3]);
   }
 
-  // perspectiveDivide originally in mat4.js
+  /** Divides `[x, y, z, w]` by `w` — clip space to normalized device coordinates. */
   static perspectiveDivide(v: Vec4): Vec3 {
     return Vec3.fromArray(JSMat4.perspectiveDivide(v.toArray()));
   }

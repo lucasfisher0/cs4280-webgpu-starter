@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import { encodePPM } from "./ppm";
+import {describe, expect, test} from "vitest";
+import {encodePPM} from "@/lib/image/ppm.js";
 
 describe("PPM Encoding", () => {
   test("Matches given example", () => {

@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import { medianCutPalette, nearestPaletteIndex } from "./palette";
+import {describe, expect, test} from "vitest";
+import {medianCutPalette, nearestPaletteIndex} from "@/lib/image/palette.js";
 
 describe("Indexed Color", () => {
   test("should correctly select color palette", () => {

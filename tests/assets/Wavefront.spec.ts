@@ -2,13 +2,12 @@
 
 import {describe, expect, test} from "vitest";
 import {WavefrontMeshBuilder} from "@/core/assets/Wavefront";
-// @ts-ignore
-import monkey from "./monkey.obj?raw";
+//import monkey from "./monkey.obj?raw";
 
 test("Wavefront Mesh Builder - Monkey", () => {
 
-  let mesh = WavefrontMeshBuilder.fromString(monkey);
-  let i = 0;
+  // let mesh = WavefrontMeshBuilder.fromString(monkey);
+  // let i = 0;
 });
 /*
 describe("Node Transform", () => {

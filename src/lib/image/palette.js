@@ -95,7 +95,7 @@ function selectWidestChannel(pixels) {
     maxWidth = width;
   }
 
-  console.log(`Cutting channel ${channel} with width: ${maxWidth}`);
+  // console.log(`Cutting channel ${channel} with width: ${maxWidth}`);
   return channel;
 }
 
