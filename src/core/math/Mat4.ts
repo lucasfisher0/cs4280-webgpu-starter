@@ -1,6 +1,7 @@
 import * as JSMat4 from "@/lib/math/mat4.js";
 import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
+import * as Transform from "@/core/math/Transform.ts";
 
 export class Mat4 {
   arr: Float32Array;
@@ -34,16 +35,62 @@ export class Mat4 {
   }
 
   /* Object Operations & Properties */
+
   // TODO: Merge this with the debug stringify.
   getString(): string {
     let str: string = "";
     for (let i = 0; i < this.arr.length; i++) {
       str += this.arr[i]!.toString().padStart(3, ' ');
-      if (i != 0 && i != this.arr.length && (i+1) % 4 === 0)
+      if (i != 0 && i != this.arr.length && (i + 1) % 4 === 0)
         str += "\n"
     }
     return str;
   }
+
+  /** Returns position as `Vec3` coordinates. */
+  position(): Vec3 {
+    return new Vec3(this.arr[12]!, this.arr[13]!, this.arr[14]!);
+  };
+
+  /** Returns scaling as `Vec3` factors. */
+  scale3(): Vec3 {
+    const sx = new Vec3(
+      this.arr[0]! * this.arr[0]!,
+      this.arr[4]! * this.arr[4]!,
+      this.arr[8]! * this.arr[8]!).length();
+    const sy = new Vec3(
+      this.arr[1]! * this.arr[1]!,
+      this.arr[5]! * this.arr[5]!,
+      this.arr[9]! * this.arr[9]!).length();
+    const sz = new Vec3(
+      this.arr[2]! * this.arr[2]!,
+      this.arr[6]! * this.arr[6]!,
+      this.arr[10]! * this.arr[10]!).length();
+
+    return new Vec3(sx, sy, sz);
+  };
+
+  /** Returns translation component as a standalone matrix. */
+  translation(): Mat4 {
+    return Transform.translate(this.arr[12]!, this.arr[13]!, this.arr[14]!);
+  };
+
+  /** Returns rotation component as a standalone matrix. */
+  rotation(): Mat4 {
+    //const scale = this.scale3();
+    // return Transform.fromEulerZYX()
+    // TODO: Implement and test
+
+
+    return Mat4.Identity();
+  };
+
+  /** Returns scale component as a standalone matrix. */
+  scale(): Mat4 {
+    const scale = this.scale3();
+    return Transform.scale(scale.x, scale.y, scale.z)
+  };
+
 
   /** Transforms a `Vec3` point (implicit `w = 1`) by `m`, returning the full `Vec4` quadruple *before* any perspective divide. */
   transformPoint(p: Vec3): Mat4 {

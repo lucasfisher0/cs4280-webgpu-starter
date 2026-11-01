@@ -1,14 +1,14 @@
 import {describe, expect, test} from "vitest";
-
 import {Vec2} from "@/core/math/Vec2";
 import {Vec3} from "@/core/math/Vec3";
 import {Vec4} from "@/core/math/Vec4";
 import {Mat4} from "@/core/math/Mat4";
 import * as Transform from "@/core/math/Transform.ts"
-import {compareMatrix, compareMatrixError, stringifyMatrix} from "@/core/debug/Mat4";
-// @ts-ignore
-import "@/core/extensions/Mat4.ts"
+import {compareMatrix, compareMatrixError} from "@/core/debug/Mat4";
 
+function deg2rad(deg: number) {
+  return deg * Math.PI / 180;
+}
 
 describe("Composition", () => {
   // Assignment 2 feedback:
@@ -27,9 +27,9 @@ describe("Composition", () => {
   });
 
   test("Rotated", () => {
-    const mm = m.multiply(Transform.rotateX(90));
+    const mm = m.multiply(Transform.rotateX(deg2rad(90)));
     const out: Vec4 = Mat4.multiplyVec4(mm, v);
-    const expected: Vec4 = new Vec4(3, -2, 5, 1);
+    const expected: Vec4 = new Vec4(3, -5, -2, 1);
 
     expect(out.x).toEqual(expected.x);
     expect(out.y).toEqual(expected.y);
@@ -40,7 +40,8 @@ describe("Composition", () => {
   test("Vec3 Position", () => {
     const out: Mat4 = Mat4.multiply(m, Mat4.Identity());
     const pos = out.position();
-    const expected = new Vec3(3, -2, 5);
+
+    const expected = new Vec3(2, -3, 4);
     expect(pos.toArray()).toEqual(expected.toArray());
   });
 });

@@ -1,13 +1,11 @@
 {
+  // // https://stevekinney.com/courses/react-typescript/tsconfig-deep-dive-react
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "composite": true,
-    "skipLibCheck": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
   },
-  "include": [
-    "vite.config.ts",
-  ]
+  "include": ["vite.config.ts"]
 }

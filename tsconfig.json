@@ -6,26 +6,31 @@
     "rootDir": "./src",
     "outDir": "./dist",
     "paths": {
-        "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     },
-
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
     "module": "ESNext",
     "target": "ESNext",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "web"],//, "@webgpu/types"],
-
+    "lib": [
+      "ESNext",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "vite/client",
+      "web"
+    ],
     // Other Outputs
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
-
     // Stricter Typechecking Options
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "allowUnreachableCode": false,
-
     // Bundler Mode
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -33,12 +38,10 @@
     "moduleDetection": "force",
     "noEmit": true,
     "isolatedModules": true,
-
     // JavaScript Support
     "allowJs": true,
     "checkJs": false,
     "esModuleInterop": true,
-
     // Linting
     "strict": true,
     "noUnusedLocals": false,
@@ -48,17 +51,24 @@
     "noImplicitReturns": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
-
     // Check if these are needed:
-    "noUncheckedSideEffectImports": false
+    "noUncheckedSideEffectImports": true,
+    "allowSyntheticDefaultImports": true
   },
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ],
   "include": [
-    "./src",
+    "src/**/*",
+    "tests/**/*"
   ],
   "exclude": [
-    "./src/deprecated",
-    "./tests",
-    "./node_modules",
-    "./dist"
+    "node_modules/**/*",
+    "dist/**/*"
   ]
 }

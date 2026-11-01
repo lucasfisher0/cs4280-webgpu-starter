@@ -85,7 +85,7 @@ export class SceneNode {
 
   updateWorldTransform(parentWorldTransform: Mat4 = Mat4.Identity()) {
     if (this.parent)
-      this._worldTransform = Mat4.multiply(this.parent.worldTransform, this._localTransform);
+      this._worldTransform = Mat4.multiply(this._localTransform, parentWorldTransform);
 
     if (!this.#transformDirty)
       return;
@@ -96,7 +96,7 @@ export class SceneNode {
     this.#transformDirty = false;
   }
 
-  tick(data: TickData): void {
+  tick(_data: TickData): void {
     // NOOP - purely a virtual function
   }
 }

@@ -22,9 +22,12 @@ export class Camera extends SceneNode {
   clipFar: number = 50;
   verticalFov: number = 1.0472; // 60 deg, vertical FoV
 
+  /** Returns camera position. Intended to be overriden for custom camera classes. */
+  getCameraPosition(): Vec3 { return this.worldTransform.position();}
+
   getViewMatrix(target?: Vec3) {
     return Transform.lookAt(
-      this.getWorldTransform().getPosition(),
+      this.getCameraPosition(),
       target ?? Vec3.Zero(),
       new Vec3(0, 1, 0)
     );

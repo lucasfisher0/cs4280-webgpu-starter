@@ -1,23 +1,20 @@
 import {defineConfig, mergeConfig} from "vitest/config";
-import path from "path";
 // @ts-ignore
 import viteConfig from "./vite.config.ts";
 
-let defines = viteConfig.define;
-//defines["__ENABLE_SCENE_EDITOR__"] = false;
-
-export default defineConfig({
-  root: "src",
-  publicDir: "public",
-  define: defines ?? {},
-  resolve: {
-    tsconfigPaths: true,
-    alias: {
-      "@": path.resolve(import.meta.dirname, './src'),
+export default mergeConfig(
+  viteConfig,
+  defineConfig({
+    test: {
+      root: import.meta.dirname,
+      environment: "jsdom",
+      setupFiles: ["./vitest.setup.js"],
+      include: ["tests/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
+      exclude: [
+        "**/node_modules/**",
+        "**/.git/**",
+        "**/dist/**"
+      ]
     }
-  },
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./vitest.setup.js"],
-  },
-});
+  })
+);
