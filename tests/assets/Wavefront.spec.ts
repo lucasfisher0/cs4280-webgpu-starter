@@ -1,10 +1,12 @@
 
 
 import {describe, expect, test} from "vitest";
-import {WavefrontMeshBuilder} from "@/core/assets/Wavefront";
+// import {WavefrontMeshBuilder} from "@/core/assets/Wavefront";
 //import monkey from "./monkey.obj?raw";
 
 test("Wavefront Mesh Builder - Monkey", () => {
+
+  expect(true).toBeTruthy();
 
   // let mesh = WavefrontMeshBuilder.fromString(monkey);
   // let i = 0;

@@ -51,23 +51,23 @@
     // Each is a 4x4 array of rows: B[r][k] is the coefficient of u^r in the
     // blending function b_k(u). The zeros are placeholders.
 
-    // TODO: the cubic Bézier basis matrix (slide "The Cubic Bézier Basis").
+    // the cubic Bézier basis matrix (slide "The Cubic Bézier Basis").
     // <<< CHANGE
     const BEZIER_B = [[1, 0, 0, 0], [-3, 3, 0, 0], [3, -6, 3, 0], [-1, 3, -3, 1]];
     // >>>
 
-    // TODO: the Hermite basis matrix, for control values f(0), f'(0), f(1), f'(1)
+    // the Hermite basis matrix, for control values f(0), f'(0), f(1), f'(1)
     // (slide "Hermite Cubics").
     // <<< CHANGE
     const HERMITE_B = [[1, 0, 0, 0], [0, 1, 0, 0], [-3, -2, 3, -1], [2, 1, -2, 1]];
     // >>>
 
-    // TODO: the uniform cubic B-spline basis matrix (slide "Uniform Cubic B-Splines").
+    // the uniform cubic B-spline basis matrix (slide "Uniform Cubic B-Splines").
     // <<< CHANGE
     const BSPLINE_B = [[1, 4, 1, 0], [-3, 0, 3, 0], [3, -6, 3, 0], [-1, 3, -3, 1]].map((row) => row.map((v) => v / 6));
     // >>>
 
-    // TODO: the cardinal basis matrix for tension τ, with s = (1 − τ) / 2
+    // the cardinal basis matrix for tension τ, with s = (1 − τ) / 2
     // (slides "Cardinal Splines" and "Catmull–Rom Splines"). τ = 0 gives Catmull–Rom.
     function cardinalB(tension) {
       // <<< CHANGE
@@ -84,7 +84,7 @@
     const wrap = (i, n) => ((i % n) + n) % n;                 // closed: indices wrap around
     const clamp = (i, n) => Math.min(n - 1, Math.max(0, i));  // open: repeat the end points
 
-    // TODO: Bézier. Segment i uses P[3i] ... P[3i+3]; neighbors share an end
+    // Bézier. Segment i uses P[3i] ... P[3i+3]; neighbors share an end
     // point (slide "Joining Bézier Segments"). Make as many whole segments as P allows.
     function gatherBezier(P) {
       const segments = [];
@@ -94,7 +94,7 @@
       return segments;
     }
 
-    // TODO: Hermite. The points come in pairs: an anchor P[2j], then a handle
+    // Hermite. The points come in pairs: an anchor P[2j], then a handle
     // P[2j+1] whose velocity is v = 3 (handle − anchor). Segment i runs from
     // anchor 2i to anchor 2i+2, with control values: anchor, its velocity,
     // the next anchor, its velocity. Ignore an unpaired last point.
@@ -107,7 +107,7 @@
       return segments;
     }
 
-    // TODO: cardinal / Catmull–Rom. The segment from P[i] to P[i+1] uses
+    // cardinal / Catmull–Rom. The segment from P[i] to P[i+1] uses
     // P[i−1], P[i], P[i+1], P[i+2]. An open path has n − 1 segments and
     // repeats its end points (clamp); a closed path has n segments and
     // wraps the indices (wrap).
@@ -123,7 +123,7 @@
       return segments;
     }
 
-    // TODO: uniform cubic B-spline. Segment i uses P[i] ... P[i+3]. An open
+    // uniform cubic B-spline. Segment i uses P[i] ... P[i+3]. An open
     // path has n − 3 segments; a closed path has n and wraps the indices.
     function gatherBSpline(P, closed) {
       const segments = [];

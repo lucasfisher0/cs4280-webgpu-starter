@@ -20,7 +20,7 @@ import {OrbitCamera} from "@/core/render/OrbitCamera.ts";
 
 // Local
 import shaderCode from "./shaders.wgsl?raw";
-import {ModelNode} from "@/core/scenegraph/ModelNode.ts";
+import {ModelNode, type ModelNodeDescriptor} from "@/core/scenegraph/ModelNode.ts";
 import {Material} from "@/core/render/Material.ts";
 import {SceneNode} from "@/core/scenegraph/SceneNode.ts";
 import {Texture} from "@/core/render/Texture.ts";
@@ -114,7 +114,7 @@ class InstancedModelNode extends ModelNode {
   isVisible: boolean = true;
 
   getInstanceData(): number[] {
-    return [...this.getWorldTransform().toArray(), this.material];//, 0, 0, 0];
+    return [...this.worldTransform.toArray(), this.material];//, 0, 0, 0];
   }
 }
 
@@ -175,44 +175,35 @@ async function InitWebGPU() {
   await metalTex.loadTexture(device, "/textures/metal.png");
   const tileTex = new Texture();
   await tileTex.loadTexture(device, "/textures/floortiles.png");
-
+  // TODO: Ensure textures are all the same size
 
   // SceneGraph
-  const floor = new InstancedModelNode(cubeMesh, {name: "Floor"});
-  floor.translation = Transform.translate(0, -0.05, 0);
+  const floor = new InstancedModelNode({name: "Floor", mesh: cubeMesh});
+  floor.transform = Transform.translate(0, -0.05, 0);
   floor.material = MATERIAL_INDEX.Tile;
   scene.addChild(floor);
 
   let walls: InstancedModelNode[] = [
-    new InstancedModelNode(cubeMesh, {name: "Wall1"}),
-    new InstancedModelNode(cubeMesh, {name: "Wall2"}),
-    new InstancedModelNode(cubeMesh, {name: "Wall3"}),
-    new InstancedModelNode(cubeMesh, {name: "Wall4"})
+    new InstancedModelNode({name: "Wall1", mesh: cubeMesh}),
+    new InstancedModelNode({name: "Wall2", mesh: cubeMesh}),
+    new InstancedModelNode({name: "Wall3", mesh: cubeMesh}),
+    new InstancedModelNode({name: "Wall4", mesh: cubeMesh})
   ];
   walls.forEach(w => {w.material = MATERIAL_INDEX.Metal; scene.addChild(w)});
 
+  const deskComponentDescriptors: ModelNodeDescriptor[] = [
+    {name: "top", localTransform: Mat4.multiply(Transform.translate(0, 0.725,0), Transform.scale(1.6, 0.05, 0.8))},
+    {name: "leg1", localTransform: Mat4.multiply(Transform.translate(0.8-0.08, 0.3625, 0.4-0.08), Transform.scale(0.06, 0.70, 0.06))},
+    {name: "leg2", localTransform: Mat4.multiply(Transform.translate(0.8-0.08, 0.3625, -0.4+0.08), Transform.scale(0.06, 0.70, 0.06))},
+    {name: "leg3", localTransform: Mat4.multiply(Transform.translate(-0.8+0.08, 0.3625, 0.4-0.08), Transform.scale(0.06, 0.70, 0.06))},
+    {name: "leg4", localTransform: Mat4.multiply(Transform.translate(-0.8+0.08, 0.3625, -0.4+0.08), Transform.scale(0.06, 0.70, 0.06))},
+  ];
+
   function createDesk(): InstancedModelNode[] {
-    let top = new InstancedModelNode(cubeMesh, {name: "top"});
-    top.scale = Transform.scale(1.6, 0.05, 0.8);
-    top.translation = Transform.translate(0, 0.725,0);
-
-    let leg1 = new InstancedModelNode(cubeMesh, {name: "leg1"});
-    leg1.scale = Transform.scale(0.06, 0.70, 0.06);
-    leg1.translation = Transform.translate(0.8-0.08, 0.3625, 0.4-0.08);
-    let leg2 = new InstancedModelNode(cubeMesh, {name: "leg1"});
-    leg2.scale = Transform.scale(0.06, 0.70, 0.06);
-    leg2.translation = Transform.translate(0.8-0.08, 0.3625, -0.4+0.08);
-    let leg3 = new InstancedModelNode(cubeMesh, {name: "leg1"});
-    leg3.scale = Transform.scale(0.06, 0.70, 0.06);
-    leg3.translation = Transform.translate(-0.8+0.08, 0.3625, 0.4-0.08);
-    let leg4 = new InstancedModelNode(cubeMesh, {name: "leg1"});
-    leg4.scale = Transform.scale(0.06, 0.70, 0.06);
-    leg4.translation = Transform.translate(-0.8+0.08, 0.3625, -0.4+0.08);
-
-    return [top, leg1, leg2, leg3, leg4];
+    return deskComponentDescriptors.map(x => new InstancedModelNode(x));
   }
 
-  // Uniform Buffer
+  // Bind 0: Uniform Buffer
   const UNIFORM_SIZE: number = 84 * 4;
   const uniformBuffer = device.createBuffer({
     size: UNIFORM_SIZE,
@@ -222,6 +213,26 @@ async function InitWebGPU() {
   const f32 = new Float32Array(uniformData);
   const u32 = new Uint32Array(uniformData);
 
+  // Bind 1: Diffuse Textures (texture_2d_array)
+  const tex = device.createTexture({
+    label: "tex-array",
+    size: {
+      width: 100,
+      height: 100,
+      depthOrArrayLayers: 3 // texture "array" resembles as a 3D texture depth
+    },
+    format: "rgba8unorm",
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+  });
+  // TODO: link tex to existing materials
+
+  // Bind 2: Texture Sampler
+  // TODO: different bind groups for each texture sampler, WHAT?!?!?
+  const texSampler = device.createSampler(
+    { addressModeU: 'repeat', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', maxAnisotropy: 16 }
+  );
+
+  // Instance Buffer
   const FLOATS_PER_VERTEX = 6;
   const FLOATS_PER_MATRIX = 17;
   const MAX_COPIES = 1420;
@@ -254,8 +265,8 @@ async function InitWebGPU() {
     layout: bindGroupLayout,
     entries: [
       {binding: 0, resource: {buffer: uniformBuffer}},
-      {binding: 0, resource: {buffer: uniformBuffer}},
-      {binding: 0, resource: {buffer: uniformBuffer}}]
+      {binding: 0, resource: tex},
+      {binding: 0, resource: texSampler}]
   });
 
   const shaderModule = device.createShaderModule({code: shaderCode});
@@ -297,25 +308,29 @@ async function InitWebGPU() {
   scene.addChild(desks);
 
   function updateScene() {
-    floor.scale = Transform.scale(hallParams.width, 0.1, hallParams.length);
+    floor.transform = Transform.scale(hallParams.width, 0.1, hallParams.length)
 
+    // Walls
     if (hallParams.height > 0)
     {
-      walls[0]!.scale = Transform.scale(0.15, hallParams.height, hallParams.length);
-      walls[0]!.translation = Transform.translate((-hallParams.width+0.15) / 2, hallParams.height / 2, 0);
-      walls[1]!.scale = Transform.scale(0.15, hallParams.height, hallParams.length);
-      walls[1]!.translation = Transform.translate((hallParams.width-0.15) / 2, hallParams.height / 2, 0);
-      walls[2]!.scale = Transform.scale(hallParams.width, hallParams.height, 0.15);
-      walls[2]!.translation = Transform.translate(0, hallParams.height / 2, (-hallParams.length+0.15) / 2);
-      walls[3]!.scale = Transform.scale(hallParams.width, hallParams.height, 0.15);
-      walls[3]!.translation = Transform.translate(0, hallParams.height / 2, (hallParams.length-0.15) / 2);
+      walls[0]!.transform = Mat4.multiply(
+        Transform.translate((-hallParams.width+0.15) / 2, hallParams.height / 2, 0),
+        Transform.scale(0.15, hallParams.height, hallParams.length));
+      walls[1]!.transform = Mat4.multiply(
+        Transform.translate((hallParams.width-0.15) / 2, hallParams.height / 2, 0),
+        Transform.scale(0.15, hallParams.height, hallParams.length));
+      walls[2]!.transform = Mat4.multiply(
+        Transform.translate(0, hallParams.height / 2, (-hallParams.length+0.15) / 2),
+        Transform.scale(hallParams.width, hallParams.height, 0.15));
+      walls[3]!.transform = Mat4.multiply(
+        Transform.translate(0, hallParams.height / 2, (hallParams.length-0.15) / 2),
+        Transform.scale(hallParams.width, hallParams.height, 0.15));
       walls.forEach(w => w.isVisible = true);
     }
     else
       walls.forEach(w => w.isVisible = false);
 
-
-
+    // Desks
     desks.children = [];
     let deskCount = 0;
 
@@ -330,7 +345,7 @@ async function InitWebGPU() {
       const col = i % colCount;
 
       const desk = new SceneNode({name: `Desk${++deskCount}`});
-      desk.translation = Transform.translate(
+      desk.transform = Transform.translate(
         xstart + row * 2.4,
         0,
         ystart + col * 1.8);
@@ -362,7 +377,7 @@ async function InitWebGPU() {
     const view = camera.getViewMatrix();
     const a = canvas.clientWidth / canvas.clientHeight;
     const proj = perspective(camera.verticalFov, a, camera.clipNear, camera.clipFar);
-    const camPosition = camera.getWorldTransform().getPosition();
+    const camPosition = camera.getCameraPosition();
 
     f32.set(view.toArray(), 0);
     f32.set(proj, 16);

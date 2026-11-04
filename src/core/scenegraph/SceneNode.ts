@@ -3,17 +3,28 @@ import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
 import * as Transform from "@/core/math/Transform.ts"
+import {Mesh} from "@/core/render/Mesh.ts"
 
 let nodeCount: number = 0;
 
+/**
+ * Unlike all existing implementations, the SceneNode class is NOT linked to the
+ * provided JavaScript implementation. The reason for this is to allow for complete
+ * overrides of the TypeScript implementations, which is not possible without a lot of
+ * hacks.
+ *
+ * Instead, TypeScript paradigms are used, such as interfaces that include necessary
+ * data for subclassed nodes. Data structures should resemble the native JS implementations,
+ * and instead only provide additions when not referencing subclass-specific data.
+ */
+
 interface SceneNodeDescriptor {
   name?: string | null;
-  transform?: Mat4 | null;
-  translation?: Mat4 | null;
-  rotation?: Mat4 | null;
-  scale?: Mat4 | null;
+  localTransform?: Mat4 | null;
 }
 export type {SceneNodeDescriptor};
+
+type TraverseFunction = (node: SceneNode, parent: SceneNode | null) => void;
 
 /**
  * Corresponds to `SceneNode` from given content. Represents a singular transform.
@@ -29,16 +40,7 @@ export class SceneNode {
 
   constructor(desc: SceneNodeDescriptor) {
     this.name = desc.name ?? `node_${nodeCount++}`;
-
-    if (desc.transform)
-      this._localTransform = desc.transform;
-    else
-      this._localTransform = Mat4.multiplyAll([
-        desc.translation ?? Transform.translate(0, 0, 0),
-        desc.rotation ?? Mat4.Identity(),
-        desc.scale ?? Transform.scale(1, 1, 1)
-      ]);
-
+    this._localTransform = desc.localTransform ?? Mat4.Identity();
     this._worldTransform = this._localTransform;
   }
 
@@ -75,7 +77,18 @@ export class SceneNode {
   // Transforms
   public get transform(): Mat4 { return this._localTransform; };
   public set transform(transform: Mat4) { this._localTransform = transform; this.#transformDirty = true; }
-  public get worldTransform(): Mat4 { return this._worldTransform; };
+
+  /**
+   * Sets local transform on this scene node as a composite of Translation, Rotation, and Scale matrices.
+   * @param translation
+   * @param rotation
+   * @param scale
+   */
+  public setTransform(translation?: Mat4, rotation?: Mat4, scale?: Mat4) {
+    this.transform = Mat4.multiplyAll([translation ?? Mat4.Identity(), rotation ?? Mat4.Identity(), scale ?? Mat4.Identity()]);
+  }
+
+  public get worldTransform(): Mat4 { return this._worldTransform ?? this._localTransform; };
   public set worldTransform(transform: Mat4) {
     if (this.parent)
       transform = transform.multiply(this.parent.worldTransform.invert());
@@ -83,9 +96,12 @@ export class SceneNode {
     this.#transformDirty = true;
   };
 
+  /**
+   * Calculates world position using the given parent transform.
+   * @param [parentWorldTransform]
+   */
   updateWorldTransform(parentWorldTransform: Mat4 = Mat4.Identity()) {
-    if (this.parent)
-      this._worldTransform = Mat4.multiply(this._localTransform, parentWorldTransform);
+    this._worldTransform = Mat4.multiply(this._localTransform, parentWorldTransform);
 
     if (!this.#transformDirty)
       return;
@@ -96,6 +112,21 @@ export class SceneNode {
     this.#transformDirty = false;
   }
 
+  /**
+   *  Traverses a node hierarchy from the root, and calls a given function on this node and all children.
+   * @param visit
+   * @param [parent]
+   */
+  traverse(visit: TraverseFunction, parent: SceneNode | null = null) {
+    visit(this, parent);
+    for (const child of this.children)
+      child.traverse(visit, this);
+  }
+
+  /**
+   *  Tick occurs on every SceneNode, once per frame.
+   * @param _data
+   */
   tick(_data: TickData): void {
     // NOOP - purely a virtual function
   }

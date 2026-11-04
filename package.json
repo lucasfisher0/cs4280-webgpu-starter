@@ -11,13 +11,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.build.json && vite build",
-    "build-nocheck": "tsc --nocheck && vite build",
+    "build-nocheck": "tsc -p tsconfig.build.json --nocheck && vite build",
     "preview": "vite preview",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "ci": "npm run lint && npm run build",
-    "test": "vitest"
+    "test": "tsc -p tsconfig.test.json && vitest"
   },
   "//disabled": {
     "typegpu": "^0.12.6"

@@ -1,5 +1,18 @@
 import * as mat4 from "@/lib/math/mat4.js";
 
+
+
+/**
+ * All existing implementation in TypeScript simply wrap the existing JS implementations,
+ * SceneNode however is completely rewritten in TypeScript.
+ *
+ * Aside from the minimum required functionality and some tests, this class will remain
+ * unchanged.
+ */
+
+
+
+
 /**
  * A minimal, renderer-agnostic scene graph node: a local transform, an
  * optional payload (a mesh to draw, or `null` for a pure "joint" node that
@@ -32,16 +45,17 @@ export class SceneNode {
 
   /** Updates the world transforms for this node and all descendants. */
   updateWorldTransforms(_parentWorldTransform = mat4.identity()) {
+    this.worldTransform = mat4.multiply(_parentWorldTransform, this.localTransform);
     for (const child of this.children) {
       child.updateWorldTransforms(this.worldTransform);
     }
   }
 
-  /** Calls given visit function for node and all children. */
+  /** Traverses node and all children, calling a provided visitation function. */
   traverse(_visit) {
     _visit(this);
     for (const child of this.children)
-      _visit(child);
+      child.traverse(_visit);
   }
 
   /** Finds the first descendant (or this node) with the given `name`, or `null`. */

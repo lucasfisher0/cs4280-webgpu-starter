@@ -1,19 +1,20 @@
 
 import {Material, DEFAULT_MATERIAL} from "@/core/render/Material";
-import {SceneNode} from "@/core/scenegraph/SceneNode";
+import {SceneNode, type SceneNodeDescriptor} from "@/core/scenegraph/SceneNode";
 import type {Mesh} from "@/core/render/Mesh.ts";
+import {Mat4} from "@/core/math/Mat4.ts";
 
+interface ModelNodeDescriptor extends SceneNodeDescriptor{
+  mesh?: Mesh | null;
+}
+export type {ModelNodeDescriptor};
 
 
 export class ModelNode extends SceneNode {
-  mesh: Mesh;
-  // material: Material | null;
+  _mesh: Mesh | null | undefined; // TODO: Ensure safety here
 
-  constructor(mesh: Mesh,
-              // material: Material,
-              ...args: ConstructorParameters<typeof SceneNode>) {
-    super(...args);
-    this.mesh = mesh;
-    // this.material = material;
+  constructor(desc: ModelNodeDescriptor) {
+    super(desc);
+    this._mesh = desc.mesh;
   }
 }

@@ -271,7 +271,8 @@ async function InitWebGPU() {
     const normalMatrix = Mat4.invert(modelMatrix);
     device.queue.writeBuffer(uniformBuffer, 192, normalMatrix); // Needs to be transposed, so DON'T transpose it
 
-    const camPosition = camera.getWorldTransform().getPosition();
+    const camPosition = camera.getCameraPosition();
+
     device.queue.writeBuffer(uniformBuffer, 256, new Float32Array([...camPosition.toArray(), params.ambientStrength]));
     device.queue.writeBuffer(uniformBuffer, 272, new Float32Array(
       [params.lightPosition.x, params.lightPosition.y, params.lightPosition.z, params.lightStrength]
