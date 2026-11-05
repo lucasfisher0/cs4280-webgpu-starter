@@ -2,11 +2,11 @@ import {fileURLToPath, URL} from "node:url";
 import {defineConfig} from "vite";
 import path from 'path';
 
-// A plain multi-page site: every activity/assignment gets its own HTML page
+// A plain multipage site: every activity/assignment gets its own HTML page
 // (own <script type="module" src="./main.js">), not a single-page app with
 // client-side routing. Vite's dev server serves any of these paths
 // directly with no extra config; for `vite build`, every page needs to be
-// listed as a build input below or it won't end up in dist/. Paths are
+// listed as a build input below, or it won't end up in dist/. Paths are
 // relative to src/ (this project's Vite `root`). activities/ and
 // assignments/ are currently just placeholder folders (see their
 // README.md) — add an entry here (e.g. "activities/week03-transforms/
@@ -18,6 +18,7 @@ const pages = [
   "assignments/a3-sierpinski-gasket/index.html",
   "assignments/a3-sierpinski-gasket/index.html",
   "assignments/a4-instancing-textures/index.html",
+  "assignments/template/index.html",
   "activities/sample-triangle/index.html",
   "activities/pyramid-mvp/index.html",
   "activities/pyramid-shaded/index.html",
@@ -52,7 +53,7 @@ export default defineConfig({
     emptyOutDir: true,
     // minify: 'esbuild',
     sourcemap: true,
-    rollupOptions: {
+    rolldownOptions: {
       input: Object.fromEntries(
         pages.map((page) => [
           page.replace(/\/index\.html$/, "").replace(/\.html$/, ""),

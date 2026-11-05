@@ -8,7 +8,7 @@
   <title>Assignment 4 — Instancing &amp; Textures · CS 4280</title>
 </head>
 
-<body>
+<body class="bg-zinc-800 min-h-screen flex flex-col items-center p-6 font-sans">
 <script>
   function toggleVisibility(id) {
     const elem = document.getElementById(id);
@@ -16,28 +16,22 @@
       elem.toggleAttribute("collapsed");
   }
 </script>
-<div class="page">
+
+<main class="w-full max-w-2xl border border-zinc-800 rounded-xl overflow-hidden shadow-2xl relative">
   <a class="back-link" href="/">← Back to course home</a>
   <h1>Assignment 4 — Instancing &amp; Textures</h1>
-  <h3>Technical Information</h3>
-  <ul>
-    <li>Fill out post submission.</li> .
-  </ul>
 
-  <h3>Post-Submission Questions</h3>
-
-  <p>Todo...</p>
-
-  <div class="layout">
-    <div class="canvas-frame drag-surface" id="canvasFrame" style="min-height: 35em;">
-      <canvas id="canvas"></canvas>
-      <p id="status" class="status-overlay" hidden></p>
-    </div>
-    <div class="controls" id="controlBox">
-      <h3>Transform &amp; Camera Controls</h3>
-    </div>
+  <div class="relative aspect-[16/10] bg-black canvas-frame drag-surface" id="canvasFrame">
+    <canvas id="gpu-canvas" class="w-full h-full touch-none cursor-grab active:cursor-grabbing block"></canvas>
+    <p id="status" class="status-overlay" hidden></p>
   </div>
-</div>
+
+  <div class="flex justify-between items-center px-4 py-2 border-t border-zinc-800 text-xs text-zinc-500">
+    <span>Drag on canvas to orbit view</span>
+    <span id="fps-label">FPS: --</span>
+  </div>
+</main>
+
 <script type="module" src="./index.ts"></script>
 </body>
 </html>

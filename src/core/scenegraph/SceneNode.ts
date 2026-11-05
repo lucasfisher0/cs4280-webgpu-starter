@@ -57,6 +57,11 @@ export class SceneNode {
       child.parent = this;
     });
   }
+  /** Adds this node to another. */
+  addToNode(parent: SceneNode): this {
+    parent.addChild(this);
+    return this;
+  }
 
   /** Finds the first descendant (or this node) with the given name or guid. */
   find(name?: string, guid?: string): SceneNode | null {
