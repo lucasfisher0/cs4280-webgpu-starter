@@ -130,9 +130,9 @@ export class SceneNode {
 
   /**
    *  Tick occurs on every SceneNode, once per frame.
-   * @param _data
+   * @param _dt
    */
-  tick(_data: TickData): void {
+  tick(_dt: number): void {
     // NOOP - purely a virtual function
   }
 }

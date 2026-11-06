@@ -1,10 +1,10 @@
 
 // Tick
 declare global {
-  type PointerMovement = [x: number, y: number];
+  type PointerPosition = [x: number, y: number];
   interface TickData {
     deltaTime: number;
-    drag_movement: PointerMovement;
+    drag_movement: PointerPosition;
   }
 
   interface WindowEventMap {

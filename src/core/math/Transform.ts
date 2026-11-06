@@ -6,6 +6,10 @@ export function translate(_tx: number, _ty: number, _tz: number): Mat4 {
   return new Mat4(JSTransforms.translate(_tx, _ty, _tz));
 }
 
+export function translateVec3(_t: Vec3): Mat4 {
+  return translate(_t.x, _t.y, _t.z);
+}
+
 export function scale(_sx: number, _sy: number, _sz: number): Mat4 {
   return new Mat4(JSTransforms.scale(_sx, _sy, _sz));
 }
@@ -33,7 +37,6 @@ export function fromEulerZYX(_yaw: number, _pitch: number, _roll: number): Mat4 
 // View Operations
 export function lookAt(_eye: Vec3, _target: Vec3, _up: Vec3): Mat4 {
   return new Mat4(JSTransforms.lookAt(_eye.toArray(), _target.toArray(), _up.toArray()));
-
 }
 export function perspective(_fovYRadians: number, _aspect: number, _near: number, _far: number): Mat4 {
   return new Mat4(JSTransforms.perspective(_fovYRadians, _aspect, _near, _far));

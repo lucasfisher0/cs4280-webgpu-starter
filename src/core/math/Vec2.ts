@@ -4,9 +4,9 @@ export class Vec2 {
   x: number;
   y: number;
 
-  constructor(x: number, y: number) {
+  constructor(x: number, y?: number) {
     this.x = x;
-    this.y = y;
+    this.y = y ?? x;
   }
 
   /* Object Meta */
@@ -54,12 +54,14 @@ export class Vec2 {
     let xy = JSVec2.normalize(this.toArray());
     this.x = xy[0] ?? this.x;
     this.y = xy[1] ?? this.y;
+    return this;
   }
 
   negate() {
     let xy = JSVec2.negate(this.toArray());
     this.x = xy[0] ?? this.x;
     this.y = xy[1] ?? this.y;
+    return this;
   }
 
   /* Static Operations */
