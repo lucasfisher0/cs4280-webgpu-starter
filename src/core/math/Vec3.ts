@@ -5,10 +5,10 @@ export class Vec3 {
   y: number;
   z: number;
 
-  constructor(x: number, y: number, z: number) {
+  constructor(x: number, y?: number, z?: number) {
     this.x = x;
-    this.y = y;
-    this.z = z;
+    this.y = y ?? x;
+    this.z = z ?? y ?? x;
   }
 
   /* Object Meta */

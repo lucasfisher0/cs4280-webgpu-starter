@@ -1,7 +1,10 @@
+import {Vec3} from "@/core/math/Vec3.ts";
+import {Camera} from "@/core/components/Camera.ts";
+
 type PointerRegistration = {
   id: string,
   abort: AbortController,
-  eventCallback: (e: PointerEvent) => void,
+  eventCallback: (e: PointerEvent, elem: HTMLElement, point: Vec3) => void,
 };
 
 type KeyCallback = (e: KeyboardEvent) => void;
@@ -60,7 +63,7 @@ export abstract class InputManager {
 
   public static registerPointer(
     id: string,
-    eventCallback: (event: PointerEvent) => void) {
+    eventCallback: (event: PointerEvent, elem: HTMLElement, point: Vec3, dir: Vec3) => void) {
     const elem = InputManager.elementCache[id] ?? document.getElementById(id);
     if (!elem) {
       console.warn(`InputManager.registerPointer: Failed to find element with id '${id}'.`)
@@ -82,7 +85,26 @@ export abstract class InputManager {
           const reg = InputManager.pointerRegistrations[elem.id];
           if (!reg)
             return;
-          reg.eventCallback(e as PointerEvent);
+
+          let pos = Vec3.Zero();
+          if (elem instanceof HTMLCanvasElement) {
+            const rect = (elem as HTMLCanvasElement).getBoundingClientRect();
+            const aspect = rect.width / rect.height;
+            pos.x += (((e.clientX - rect.left) / rect.width) * 2 - 1) * aspect;
+            pos.y += 1 - ((e.clientY - rect.top) / rect.height) * 2;
+          }
+
+          /* const cameraPos = Camera.activeCamera.getCameraPosition();
+          pos.x += cameraPos.x;
+          pos.y += cameraPos.y;
+          pos.z += cameraPos.z;
+
+          const dir = Camera.activeCamera.getForwardVector();
+
+          if (e.type === "pointerdown")
+            console.warn("World Position: " + pos.toArray()); */
+
+          reg.eventCallback(e as PointerEvent, elem, pos);
         }
         let event = e as PointerEvent;
       }, {signal: abortController.signal});

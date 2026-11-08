@@ -6,6 +6,7 @@ import * as Transform from "@/core/math/Transform.ts"
 
 import {SceneNode, type SceneNodeDescriptor} from "@/core/scenegraph/SceneNode";
 import {InputManager} from "@/core/InputManager.ts";
+import {perspective} from "@/core/math/Transform.ts";
 
 /* export enum FOV_TYPE {
   HORIZONTAL,
@@ -15,6 +16,16 @@ import {InputManager} from "@/core/InputManager.ts";
 } // TODO: use these to support setting FOV in any format
 */
 
+// Bounds for an orthographic projection, in NDC. Clip near/far already exist.
+type OrthographicBound = {
+  width: Vec2;
+  height: Vec2;
+}
+export type {OrthographicBound};
+
+type ProjectionType = "perspective" | "orthographic";
+export type {ProjectionType};
+
 interface CameraNodeDescriptor extends SceneNodeDescriptor {
   sensitivity?: Vec2;
   tetherDistance?: number;
@@ -22,10 +33,21 @@ interface CameraNodeDescriptor extends SceneNodeDescriptor {
   spinEnabled?: boolean;
   clipNear?: number;
   clipFar?: number;
-  fov?: number;
+
   canvasId: string;
+  projection?: ProjectionType;
+  fov?: number;
+  orthographicBound?: OrthographicBound;
+
+  lockMovement?: boolean;
+  lockRotation?: boolean;
 }
 export type {CameraNodeDescriptor};
+
+const DEFAULT_ORTHO: OrthographicBound = {
+  width: new Vec2(0.0, 0.0),
+  height: new Vec2(0.0, 0.0),
+}
 
 /**
  * Custom camera class to encapsulate all behavior, such as positioning and controls.
@@ -36,13 +58,20 @@ export class Camera extends SceneNode {
   tetherRotation: Vec3 = new Vec3(0, 0, 0);
   spinSpeed: number;
   spinEnabled: boolean;
+  lockRotation: boolean;
+
   clipNear: number;
   clipFar: number;
+  projection: ProjectionType;
   verticalFov: number;
+  orthoBound?: OrthographicBound;
+
   moveSpeed: number = 0.1;
   moveSpeedMultiplier: number = 3; // Shift multiplier for move speed
+  lockMovement: boolean;
 
-  static activeCamera: Camera | null = null;
+  static activeCamera: Camera;
+  canvas?: HTMLCanvasElement;
   canvasId: string; // Currently no safety-- this should not be changed while input is bound
 
   constructor(desc: CameraNodeDescriptor) {
@@ -52,10 +81,18 @@ export class Camera extends SceneNode {
     this.tetherDistance = desc.tetherDistance ?? 0;
     this.spinSpeed = desc.spinSpeed ?? 0.2; // Spin speed in rad/s
     this.spinEnabled = desc.spinEnabled ?? false;
+    this.lockRotation = desc.lockRotation ?? false;
 
     this.clipNear = desc.clipNear ?? 1;
     this.clipFar = desc.clipFar ?? 50;
+    this.projection = desc.projection ?? "perspective"
     this.verticalFov = desc.fov ?? 1.0472; // 60 deg, vertical FoV
+    this.orthoBound = desc.orthographicBound ?? DEFAULT_ORTHO;
+
+    // moveSpeed
+    // moveSpeedMultiplier
+    this.lockMovement = desc.lockMovement ?? false;
+
     this.canvasId = desc.canvasId;
 
     if (Camera.activeCamera == null)
@@ -73,7 +110,7 @@ export class Camera extends SceneNode {
 
   pointer_pos: PointerPosition | null = null;
   pointer_last: PointerPosition | null = null;
-  dragging = false;
+  dragging: boolean = false;
 
   registerInput(canvasId?: string) {
     this.canvasId = canvasId ?? this.canvasId;
@@ -82,7 +119,7 @@ export class Camera extends SceneNode {
       return;
     }
 
-    InputManager.registerPointer(canvasId as string, this.onPointerInput);
+    InputManager.registerPointer(canvasId as string, this.onPointerInput.bind(this));
   }
 
   unregisterInput() {
@@ -90,11 +127,26 @@ export class Camera extends SceneNode {
     // TODO: InputManager needs to be able to unregister keyboard callbacks
   }
 
-  onPointerInput(event: PointerEvent) {
+  onPointerInput(event: PointerEvent, elem: HTMLElement, point: Vec3) {
     if (event.type === "pointerdown") {
-      console.log("Camera: Pointer down!");
       this.pointer_pos = [event.clientX, event.clientY];
       this.dragging = true;
+
+
+      let view = this.getViewMatrix().invert();
+      let proj = this.getProjection().invert();
+
+      const cameraPos = this.getCameraPosition();
+      let worldPos = Mat4.multiplyAll([proj, view, Transform.translateVec3(point)]).position();
+      worldPos = Vec3.add(worldPos, cameraPos);
+
+      const dir = this.getForwardVector();
+
+      console.log("World position of click: " + worldPos.toArray())
+
+
+
+
     } else if (event.type === "pointerup") {
       this.dragging = false;
       this.pointer_last = null;
@@ -140,12 +192,42 @@ export class Camera extends SceneNode {
   }
 
   /** Returns camera view matrix. **/
-  getViewMatrix(target?: Vec3) {
+  getViewMatrix(target?: Vec3): Mat4 {
     return Transform.lookAt(
       this.getCameraPosition(),
       target ?? Vec3.add(this.getCameraPosition(), this.getForwardVector()),
       new Vec3(0, 1, 0)
     );
+  }
+
+  /** Returns projection matrix for this camera. */
+  getProjection(): Mat4 {
+
+    if (this.projection == "perspective") {
+      if (!this.canvas) {
+        this.canvas = document.getElementById(this.canvasId) as HTMLCanvasElement;
+      }
+      if (!this.canvas)
+        console.error("Camera.getProjection(): Could not retrieve canvas for projection!");
+
+      const a = (this.canvas?.clientWidth ?? 1) / (this.canvas?.clientHeight ?? 1);
+      return perspective(this.verticalFov, a, this.clipNear, this.clipFar);
+    }
+    else if (this.projection == "orthographic") {
+      if (!this.orthoBound)
+        console.error("Camera.getProjection(): Orthographic projection did not have a bound!");
+
+      return Transform.ortho(
+        this.orthoBound?.width.x ?? -1.0,
+        this.orthoBound?.width.y ?? 1.0,
+        this.orthoBound?.height.x ?? -1.0,
+        this.orthoBound?.height.y ?? 1.0,
+        this.clipFar,
+        this.clipFar
+      );
+    }
+
+    throw new Error("Camera.getProjection(): Unimplemented projection type!");
   }
 
   /** Adds rotation in radian components of yaw/pitch/roll. **/
@@ -178,9 +260,10 @@ export class Camera extends SceneNode {
     if (this.spinEnabled)
       this.tetherRotation.y += this.spinSpeed * _dt;
 
-    // Dragging - Camera rotation and movement
-    if (this.dragging)
-      // Camera rotation
+    // console.log("Camera: pos: " + this.getCameraPosition().toArray() + " forward: " + this.getForwardVector().toArray());
+
+    // Dragging - Camera rotation
+    if (this.dragging && !this.lockRotation)
       if (this.pointer_pos) {
         if (this.pointer_last) {
           let drag_movement: PointerPosition = [
@@ -195,15 +278,17 @@ export class Camera extends SceneNode {
       }
 
     // Camera Movement
-    let moveInput = Vec2.Zero();
-    moveInput.x += Number(InputManager.isKeyDown("d"));
-    moveInput.x -= Number(InputManager.isKeyDown("a"));
-    moveInput.y += Number(InputManager.isKeyDown("w"));
-    moveInput.y -= Number(InputManager.isKeyDown("s"));
-    if (moveInput.x != 0 || moveInput.y != 0) {
-      moveInput.normalize();
-      const distance = this.moveSpeed * _dt * (this.moveSpeedMultiplier * Number(InputManager.isShiftDown))
-      this.addMovement(Vec2.scale(moveInput, distance));
+    if (!this.lockMovement) {
+      let moveInput = Vec2.Zero();
+      moveInput.x += Number(InputManager.isKeyDown("d"));
+      moveInput.x -= Number(InputManager.isKeyDown("a"));
+      moveInput.y += Number(InputManager.isKeyDown("w"));
+      moveInput.y -= Number(InputManager.isKeyDown("s"));
+      if (moveInput.x != 0 || moveInput.y != 0) {
+        moveInput.normalize();
+        const distance = this.moveSpeed * _dt * (this.moveSpeedMultiplier * Number(InputManager.isShiftDown))
+        this.addMovement(Vec2.scale(moveInput, distance));
+      }
     }
   }
 }

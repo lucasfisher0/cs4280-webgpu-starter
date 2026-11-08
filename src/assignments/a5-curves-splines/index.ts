@@ -11,6 +11,9 @@ import {Mat4} from "@/core/math/Mat4.ts";
 import * as Transform from "@/core/math/Transform.ts";
 import {InputManager} from "@/core/InputManager.ts";
 import {Camera} from "@/core/components/Camera.ts";
+import {perspective} from "@/core/math/Transform.ts";
+import {fromString, parseMTL, DEFAULT_MATERIAL} from "@/core/assets/Wavefront.ts";
+import {SplineNode} from "@/core/components/SplineNode.ts";
 
 enum Mode {
   DESIGN = 0,
@@ -28,16 +31,42 @@ gui.add({callback: () => state.mode = Mode.DRIVE}, "callback").name("Design");
 //#endregion
 
 
+async function loadCar() {
+
+
+  const carOBJ = await fetch("a5/car.obj");
+  let {positions, texcoords, normals, triangles, materialLibraries} = fromString(await carOBJ.text());
+
+  const carMTL = await fetch("a5/car.mtl");
+  let materials = parseMTL(await carMTL.text());
+
+  // Make ONE vertex for each corner-- UNINDEX THE MESH.
+}
+
 async function init() {
   try {
     const {canvas, device, context, format} = await initializeWebGPU('gpu-canvas');
 
+    //#region SCENE
     const scene = new SceneNode({name: "root"});
-    const camera = new Camera({
-      name: "Camera",
+    const designCamera = new Camera({
+      name: "Design Camera",
       canvasId: "gpu-canvas",
-      clipFar: 500}
+      clipFar: 500,
+      lockMovement: true,
+      lockRotation: true
+    }).addToNode(scene);
+
+    const splineNode = new SplineNode(device, format, {
+      name: "SplineNode"}
     ).addToNode(scene);
+
+    const driveCamera = new Camera({
+      name: "Drive Camera",
+      canvasId: "gpu-canvas",
+      clipFar: 500
+    }).addToNode(scene);
+    //#endregion
 
     //#region UNIFORM
     const UNIFORM_SIZE: number = 84 * 4;
@@ -48,6 +77,9 @@ async function init() {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     device.popErrorScope().then(e => e && console.error('uniform buffer error:', e.message));
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE);
+    const f32 = new Float32Array(uniformData);
+    const u32 = new Uint32Array(uniformData);
     //endregion
 
     //#region SHADERS
@@ -110,6 +142,30 @@ async function init() {
       null,
       (renderPass: GPURenderPassEncoder, dt: number, aspect: number, time: number) => {
 
+        designCamera.orthoBound = {
+          width:  new Vec2(-10 * aspect, 10 * aspect),
+          height: new Vec2(-1.0, 1.0),
+        };
+
+
+        // Scene: Tick nodes and update transforms
+        scene.traverse((node, parent) => {
+          node.tick(dt);
+          if (parent)
+            node.updateWorldTransform(parent.worldTransform);
+        });
+
+        // Uniform Buffer - Mesh Drawing
+        const model = Mat4.Identity();
+        const view = Camera.activeCamera.getViewMatrix();
+        const proj = Camera.activeCamera.getProjection();
+
+        device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+        // SET PIPELINE -> SET BIND GROUPS -> DRAW MESHES
+
+        // Spline Nodes
+        splineNode.draw(renderPass);
       });
   } catch (error) {
     console.error("WebGPU Initialization Error:", error);

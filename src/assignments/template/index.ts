@@ -1,5 +1,5 @@
 import {initializeWebGPU, FColor, animate} from "./webgpu.ts";
-import {OrbitCamera} from "@/core/render/OrbitCamera.ts";
+import {Camera} from "@/core/components/Camera.ts";
 import {SceneNode} from "@/core/scenegraph/SceneNode.ts";
 import {createShaderModule} from "@/lib/webgpu/shaders";
 import shaderCode from "./shaders.wgsl?raw";
@@ -21,7 +21,7 @@ async function init() {
     const {canvas, device, context, format} = await initializeWebGPU('gpu-canvas');
 
     const scene = new SceneNode({name: "root"});
-    const camera = new OrbitCamera({name: "Camera"}).addToNode(scene);
+    const camera = new Camera({name: "Camera", canvasId: "gpu-canvas"}).addToNode(scene);
     camera.clipFar = 500;
 
     //#region UNIFORM

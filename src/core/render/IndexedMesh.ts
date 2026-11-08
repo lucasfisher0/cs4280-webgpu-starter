@@ -73,7 +73,7 @@ export class IndexedMesh extends Mesh {
   override draw(pass: GPURenderPassEncoder, slot: number = 0)
   {
     pass.setVertexBuffer(slot, this.vertexBuffer);
-    pass.setIndexBuffer(this.indexBuffer, this.indexFormat);
+    pass.setIndexBuffer(this.indexBuffer!, this.indexFormat);
     pass.drawIndexed(this.indexCount);
   }
 }

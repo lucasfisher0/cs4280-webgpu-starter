@@ -3,6 +3,9 @@ import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
 import * as Transform from "@/core/math/Transform.ts";
+import {Mesh} from "@/core/render/Mesh.ts";
+import {createBuffer} from "@/lib/webgpu/buffers";
+import {IndexedMesh} from "@/core/render/IndexedMesh.ts";
 
 
 /**
@@ -81,6 +84,10 @@ type Triangle = {
   material: string | null;
 }
 
+type TriangleModel = {
+  //  Vec3[],  Vec2[], Vec3[], Triangle[], string[]
+}
+
 const isToken = (tag: string | undefined, token: OBJ_TOKEN | MTL_TOKEN): boolean => (tag == token);
 
 export function fromString(text: string, computeNormals: boolean = true) {
@@ -137,6 +144,10 @@ export function fromString(text: string, computeNormals: boolean = true) {
   }
 
   return { positions, texcoords, normals, triangles, materialLibraries };
+}
+
+export function buildMeshFromTriangles(positions: Vec3[], texcoords: Vec2[], normals: Vec3[], triangles: Triangle[]) {
+
 }
 
 /**
