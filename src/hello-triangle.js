@@ -5,12 +5,9 @@
 // hello-canvas2d.js — same setup → resize → render-loop shape, this one
 // with a WebGPU device/pipeline layer underneath it.
 
-import { createBuffer } from "@/lib/webgpu/buffers.js";
-import { configureContext, getPreferredCanvasFormat } from "@/lib/webgpu/context.js";
-import { createShaderModule } from "@/lib/webgpu/shaders.js";
+import { createBuffer, initializeWebGPU } from "@/lib/webgpu.js";
 import shaderCode from "./hello-triangle.wgsl?raw";
 
-const canvas = document.getElementById("canvasWebgpu");
 const statusEl = document.getElementById("statusWebgpu");
 
 // Interleaved [x, y, r, g, b] per vertex, positions already in clip space.
@@ -26,26 +23,19 @@ function showStatus(message) {
 }
 
 async function main() {
-  if (!navigator.gpu) {
-    showStatus("WebGPU is not supported in this browser. Try Chrome or Edge 113+.");
+  // Steps 1–2: request an adapter and device, and configure the canvas.
+  let gpu;
+  try {
+    gpu = await initializeWebGPU("canvasWebgpu");
+  } catch (err) {
+    showStatus(err.message);
     return;
   }
-  const adapter = await navigator.gpu.requestAdapter();
-  if (!adapter) {
-    showStatus("No WebGPU adapter was found.");
-    return;
-  }
-  const device = await adapter.requestDevice();
-  const format = getPreferredCanvasFormat();
-  const context = configureContext(canvas, device, format);
+  const { canvas, device, context, format } = gpu;
 
-  const vertexBuffer = createBuffer(
-    device,
-    VERTEX_DATA,
-    GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    "hello-triangle-vertices",
-  );
-  const shaderModule = createShaderModule(device, shaderCode, "hello-triangle");
+  // Steps 3–4: the vertex buffer and the shader module.
+  const vertexBuffer = createBuffer(device, VERTEX_DATA, GPUBufferUsage.VERTEX);
+  const shaderModule = device.createShaderModule({ label: "hello-triangle", code: shaderCode });
 
   // Compiled once, never inside the render loop — pipeline creation is
   // exactly when the browser compiles and validates the shaders.

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ray Tracer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-zinc-800 min-h-screen flex flex-col items-center p-6 font-sans">
+  <header class="text-center mb-4">
+    <h1 class="text-2xl font-bold text-white">Ray Tracer</h1>
+    <p class="text-xs text-zinc-400 mt-1">Traced on the CPU, drawn by WebGPU with a full-screen triangle</p>
+  </header>
+
+  <main class="w-full max-w-2xl border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+    <canvas id="gpu-canvas" class="w-full block"></canvas>
+    <div id="info" class="px-4 py-2 border-t border-zinc-800 text-xs text-zinc-500"></div>
+  </main>
+
+  <script type="module">
+    import { initializeWebGPU } from "@/lib/webgpu.js";
+    import { add, sub, scale, dot, cross, length, normalize, negate, scalarTriple } from "@/lib/math/vec3.js";
+
+    // ---------- Camera ----------
+    const nx = 640, ny = 400;
+    const e = [0, 4, 9];
+    const target = [0, 0.3, 0];
+    const up = [0, 1, 0];
+    const fovy = (35 * Math.PI) / 180;
+
+    const w = normalize(negate(sub(target, e)));
+    const u = normalize(cross(up, w));
+    const v = cross(w, u);
+
+    const t = Math.tan(fovy / 2); // window top
+    const r = (nx / ny) * t;      // window right
+
+    // ---------- Scene ----------
+    // A surface has hit(ray, t0, t1) -> { s, t, n } (or MISS) and kd(x) -> color.
+    const MISS = { t: Infinity };
+    const background = [0.6, 0.7, 0.9];
+
+    // The square |x| <= size, |z| <= size of the plane y = 0, with s-by-s tiles.
+    function Floor(size, s) {
+      return {
+        hit(ray, t0, t1) {
+          const { o: e, d } = ray;
+          const t = -e[1] / d[1];
+          if (t < t0 || t > t1) return MISS;
+          const x = add(e, scale(d, t));
+          if (Math.abs(x[0]) > size || Math.abs(x[2]) > size) return MISS;
+          return { s: this, t, n: [0, 1, 0] };
+        },
+        kd(x) {
+          const even = ((Math.floor(x[0] / s) + Math.floor(x[2] / s)) & 1) === 0;
+          return even ? [0.9, 0.9, 0.9] : [0.25, 0.25, 0.3];
+        },
+      };
+    }
+
+    // (p - c)·(p - c) - R² = 0
+    function Sphere(c, R, color, rho = 0) {
+      return {
+        rho, // reflectivity
+        hit(ray, t0, t1) {
+          const { o: e, d } = ray;
+          const A = dot(d, d);
+          const Bp = dot(d, sub(e, c)); // B' = B / 2
+          const C = dot(sub(e, c), sub(e, c)) - R * R;
+          const disc = Bp * Bp - A * C;
+          if (disc < 0) return MISS;
+
+          let t = (-Bp - Math.sqrt(disc)) / A;
+          if (t < t0 || t > t1) t = (-Bp + Math.sqrt(disc)) / A;
+          if (t < t0 || t > t1) return MISS;
+
+          const x = add(e, scale(d, t));
+          return { s: this, t, n: scale(sub(x, c), 1 / R) };
+        },
+        kd: () => color,
+      };
+    }
+
+    // Axis-aligned box: the overlap of three slabs
+    function Box(pmin, pmax, color) {
+      const c = scale(add(pmin, pmax), 0.5);
+      const h = scale(sub(pmax, pmin), 0.5);
+
+      return {
+        hit(ray, t0, t1) {
+          const { o: e, d } = ray;
+          let tnear = -Infinity, tfar = Infinity;
+          for (let k = 0; k < 3; k++) {
+            const a = 1 / d[k];
+            let tmin = a * (pmin[k] - e[k]);
+            let tmax = a * (pmax[k] - e[k]);
+            if (a < 0) [tmin, tmax] = [tmax, tmin];
+            tnear = Math.max(tnear, tmin);
+            tfar = Math.min(tfar, tmax);
+          }
+          if (tnear > tfar) return MISS;
+
+          const t = tnear > t0 ? tnear : tfar;
+          if (!(t > t0 && t <= t1)) return MISS; // also rejects NaN
+
+          // Face normal: the axis k with the largest |x_k - c_k| / h_k
+          const x = add(e, scale(d, t));
+          let k = 0;
+          for (let m = 1; m < 3; m++) {
+            if (Math.abs(x[m] - c[m]) / h[m] > Math.abs(x[k] - c[k]) / h[k]) k = m;
+          }
+          const n = [0, 0, 0];
+          n[k] = Math.sign(x[k] - c[k]);
+          return { s: this, t, n };
+        },
+        kd: () => color,
+      };
+    }
+
+    // e + t d = a + β(b - a) + γ(c - a), i.e. [a-b | a-c | d] [β γ t]ᵀ = a - e
+    // Cramer's rule, with det(x | y | z) = scalarTriple(x, y, z)
+    function Triangle(a, b, c, color) {
+      const n = normalize(cross(sub(b, a), sub(c, a)));
+
+      return {
+        hit(ray, t0, t1) {
+          const { o: e, d } = ray;
+          const ab = sub(a, b), ac = sub(a, c), ae = sub(a, e);
+          const M = scalarTriple(ab, ac, d);
+          if (Math.abs(M) < 1e-12) return MISS;
+
+          const t = scalarTriple(ab, ac, ae) / M;
+          if (t < t0 || t > t1) return MISS;
+          const gamma = scalarTriple(ab, ae, d) / M;
+          if (gamma < 0 || gamma > 1) return MISS;
+          const beta = scalarTriple(ae, ac, d) / M;
+          if (beta < 0 || beta > 1 - gamma) return MISS;
+
+          return { s: this, t, n };
+        },
+        kd: () => color,
+      };
+    }
+
+    function Tetrahedron(p0, p1, p2, p3, color) {
+      return [
+        Triangle(p0, p1, p2, color),
+        Triangle(p0, p1, p3, color),
+        Triangle(p1, p2, p3, color),
+        Triangle(p2, p0, p3, color),
+      ];
+    }
+
+    const scene = [
+      Floor(3, 1),
+      Sphere([0, 1, 0], 1, [0.9, 0.2, 0.2], 0.7),
+      Box([-2.6, 0, -0.6], [-1.6, 1, 0.4], [0.2, 0.5, 0.9]),
+      ...Tetrahedron([1.78, 0, 1.38], [1.31, 0, -0.2], [2.91, 0, 0.17], [2, 1.6, 0.45], [0.95, 0.75, 0.2]),
+    ];
+
+    function sceneHit(ray, t0, t1) {
+      let closest = MISS;
+      for (const surf of scene) {
+        const rec = surf.hit(ray, t0, t1);
+        if (rec.t < Infinity) {
+          closest = rec;
+          t1 = rec.t;
+        }
+      }
+      return closest;
+    }
+
+    // ---------- Shading ----------
+    const light = { p: [-1, 8, 6] };
+    const alpha = 0.15;           // ambient fraction
+    const ks = 0.4, p = 32;       // highlight
+    const eps = 1e-4, delta = 1e-3;
+    const maxDepth = 3;
+
+    function shadeRay(ray, t0, t1, depth = 0) {
+      const rec = sceneHit(ray, t0, t1);
+      if (rec.t === Infinity) return background;
+      const x = add(ray.o, scale(ray.d, rec.t));
+      const kd = rec.s.kd(x);
+      let n = rec.n;
+      if (dot(n, ray.d) > 0) n = negate(n); // face the ray
+
+      const r = length(sub(light.p, x));
+      const l = scale(sub(light.p, x), 1 / r);
+      const v = negate(normalize(ray.d));
+      const h = normalize(add(l, v));
+
+      const shadowRay = { o: add(x, scale(n, delta)), d: l };
+      const inShadow = sceneHit(shadowRay, eps, r).t < Infinity;
+
+      // c = kd (alpha + (1 - alpha) max(0, n·l)) + ks max(0, n·h)^p
+      let c = scale(kd, alpha);
+      if (!inShadow && dot(n, l) > 0) {
+        const spec = ks * Math.max(0, dot(n, h)) ** p;
+        c = add(scale(kd, alpha + (1 - alpha) * dot(n, l)), [spec, spec, spec]);
+      }
+
+      // Mirror: r = d - 2(d·n)n, blended as c = (1 - rho) c + rho c_reflected
+      const rho = rec.s.rho;
+      if (rho > 0 && depth < maxDepth) {
+        const rdir = sub(ray.d, scale(n, 2 * dot(ray.d, n)));
+        const mirrorRay = { o: add(x, scale(n, delta)), d: rdir };
+        c = add(scale(c, 1 - rho), scale(shadeRay(mirrorRay, eps, Infinity, depth + 1), rho));
+      }
+      return c;
+    }
+
+    // ---------- Render: one ray per pixel center ----------
+    const pixels = new Uint8ClampedArray(nx * ny * 4); // RGBA, row 0 at the top
+    const start = performance.now();
+
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        const sx = i + 0.5, sy = j + 0.5;
+        const us = ((2 * sx) / nx - 1) * r;
+        const vs = (1 - (2 * sy) / ny) * t;
+        const d = normalize(sub(add(scale(u, us), scale(v, vs)), w));
+
+        const c = shadeRay({ o: e, d }, 0, Infinity);
+        pixels.set([c[0] * 255, c[1] * 255, c[2] * 255, 255], (j * nx + i) * 4);
+      }
+    }
+
+    document.getElementById("info").textContent =
+      `Traced ${nx * ny} rays in ${(performance.now() - start).toFixed(0)} ms`;
+
+    // ---------- Display: texture + full-screen triangle ----------
+    const { canvas, device, context, format } = await initializeWebGPU("gpu-canvas");
+    canvas.width = nx;
+    canvas.height = ny;
+
+    const texture = device.createTexture({
+      size: [nx, ny],
+      format: "rgba8unorm",
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture({ texture }, pixels, { bytesPerRow: nx * 4 }, [nx, ny]);
+    const sampler = device.createSampler({ magFilter: "nearest", minFilter: "nearest" });
+
+    const shader = device.createShaderModule({
+      code: `
+        struct Out { @builtin(position) pos : vec4f, @location(0) uv : vec2f };
+        @group(0) @binding(0) var smp : sampler;
+        @group(0) @binding(1) var img : texture_2d<f32>;
+
+        @vertex fn vs(@builtin(vertex_index) i : u32) -> Out {
+          let c = vec2f(f32((i << 1u) & 2u), f32(i & 2u));     // (0,0), (2,0), (0,2)
+          return Out(vec4f(c * 2.0 - 1.0, 0.0, 1.0), vec2f(c.x, 1.0 - c.y));
+        }
+
+        @fragment fn fs(o : Out) -> @location(0) vec4f {
+          return textureSample(img, smp, o.uv);
+        }
+      `,
+    });
+
+    const pipeline = device.createRenderPipeline({
+      layout: "auto",
+      vertex: { module: shader },
+      fragment: { module: shader, targets: [{ format }] },
+    });
+
+    const bindGroup = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: sampler },
+        { binding: 1, resource: texture.createView() },
+      ],
+    });
+
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [{
+        view: context.getCurrentTexture().createView(),
+        loadOp: "clear",
+        storeOp: "store",
+      }],
+    });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.draw(3);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+  </script>
+</body>
+
+</html>
