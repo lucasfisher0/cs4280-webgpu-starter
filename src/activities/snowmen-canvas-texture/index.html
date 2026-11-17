@@ -27,7 +27,7 @@
   </main>
 
   <script type="module">
-    import { initializeWebGPU, Mesh, OrbitController, animate } from "./webgpu.js";
+    import { initializeWebGPU, Mesh, OrbitController, animate } from "@/lib/webgpu.js";
     import * as mat4 from "@/lib/math/mat4.js";
     import * as vec3 from "@/lib/math/vec3.js";
     import GUI from "lil-gui";
@@ -97,9 +97,7 @@
     lightFolder.add(state, "orbitLight").name("Orbit Light");
 
     const materialFolder = gui.addFolder("Material");
-    // <<< CHANGE
     materialFolder.add(state, "useFaceColors").name("Use Texture");
-    // >>>
     materialFolder.addColor(state, "materialColor").name("Material Color");
 
     // --- Geometry ------------------------------------------------------
@@ -138,12 +136,10 @@
 
         const color = [nx * .5 + 0.5, ny * .5 + 0.5, nz * .5 + 0.5];
 
-        // <<< CHANGE
         // Texture coordinates: u goes around, v goes top -> bottom.
         const u = j / LON_BANDS;
         const v = i / LAT_BANDS;
         vertices.push(R * nx, R * ny, R * nz, nx, ny, nz, ...color, u, v);
-        // >>>
       }
     }
 
@@ -163,14 +159,11 @@
       }
     }
 
-    // <<< CHANGE
     //  X Y Z | NX NY NZ | R G B | U V  -> 11 floats (44 bytes) per vertex
     const FLOATS_PER_VERTEX = 11;
-    // >>>
     const modelVertices = new Float32Array(vertices);
     const modelIndices = new Uint16Array(indices);
 
-    // <<< NEW
     // --- Snow texture (drawn with Canvas2D) -----------------------------
     // One 2:1 image wrapped around every sphere: x = longitude, y = latitude.
     const snowCanvas = document.createElement("canvas");
@@ -189,7 +182,6 @@
     // Show the texture under the 3D view so students can see what gets sampled.
     snowCanvas.className = "w-full max-w-2xl mt-4 rounded-xl";
     document.querySelector("main").after(snowCanvas);
-    // >>>
 
     // --- Scene graph ---------------------------------------------------
     // A node = a local transform + children. Every node is drawn as the
@@ -271,10 +263,8 @@
         lightIntensity : f32,
       };
       @group(0) @binding(0) var<uniform> u : Uniforms;
-      // <<< NEW
       @group(0) @binding(1) var snowSampler : sampler;
       @group(0) @binding(2) var snowTexture : texture_2d<f32>;
-      // >>>
 
       const PI = 3.14159265;
 
@@ -287,9 +277,7 @@
         @location(4) m1 : vec4<f32>,
         @location(5) m2 : vec4<f32>,
         @location(6) m3 : vec4<f32>,
-        // <<< NEW
         @location(7) uv : vec2<f32>,
-        // >>>
       };
 
       struct VertexOutput {
@@ -297,9 +285,7 @@
         @location(0) worldPos    : vec3<f32>,
         @location(1) worldNormal : vec3<f32>,
         @location(2) color       : vec3<f32>,
-        // <<< NEW
         @location(3) uv          : vec2<f32>,
-        // >>>
       };
 
       @vertex
@@ -314,9 +300,7 @@
         // (Fine for our uniform scales; normalize in the fragment shader fixes length.)
         output.worldNormal = (u.normalMatrix * instance * vec4<f32>(input.normal, 0.0)).xyz;
         output.color = input.color;
-        // <<< NEW
         output.uv = input.uv;
-        // >>>
         return output;
       }
 
@@ -329,9 +313,7 @@
 
         var baseColor = u.materialColor;
         if (u.useFaceColors == 1u) {
-          // <<< CHANGE
           baseColor = textureSample(snowTexture, snowSampler, input.uv).rgb;
-          // >>>
         }
 
         let ambient = u.ka * u.ambientColor * baseColor;
@@ -455,7 +437,6 @@
         const f32 = new Float32Array(uniformData);
         const u32 = new Uint32Array(uniformData);
 
-        // <<< NEW
         // Upload the canvas to the GPU, and describe how to read it:
         // linear filtering, and 'repeat' in u so the seam wraps around.
         const snowTexture = device.createTexture({
@@ -470,10 +451,8 @@
           minFilter: 'linear',
           addressModeU: 'repeat',
         });
-        // >>>
 
         const shaderModule = device.createShaderModule({ code: wgslSource });
-        // <<< CHANGE
         // Two new entries (1 and 2) for the sampler and the texture.
         const bindGroupLayout = device.createBindGroupLayout({
           entries: [{
@@ -490,7 +469,6 @@
           { binding: 1, resource: snowSampler },
           { binding: 2, resource: snowTexture.createView() }]
         });
-        // >>>
 
         const pipeline = device.createRenderPipeline({
           layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
@@ -502,10 +480,8 @@
               attributes: [
                 { shaderLocation: 0, offset: 0, format: 'float32x3' },  // position
                 { shaderLocation: 1, offset: 12, format: 'float32x3' }, // normal
-                // <<< CHANGE
                 { shaderLocation: 2, offset: 24, format: 'float32x3' }, // color
                 { shaderLocation: 7, offset: 36, format: 'float32x2' }  // uv (3..6 are the instance matrix)
-                // >>>
               ]
             }, { // second buffer layout. Slot 1 advances once per INSTANCE, not per vertex
               arrayStride: FLOATS_PER_MATRIX * 4,

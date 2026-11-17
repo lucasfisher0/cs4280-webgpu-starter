@@ -31,21 +31,17 @@
   </main>
 
   <script type="module">
-    import { initializeWebGPU, Mesh, OrbitController, animate } from "./webgpu.js";
+    import { initializeWebGPU, Mesh, OrbitController, animate } from "@/lib/webgpu.js";
     import * as mat4 from "@/lib/math/mat4.js";
     import * as vec3 from "@/lib/math/vec3.js";
     import GUI from "lil-gui";
-    // <<< NEW
     // NASA Blue Marble (public domain), equirectangular: x = longitude
     // -180..180, y = latitude 90..-90.
     // Source: https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57752/land_shallow_topo_2048.jpg
-    import earthUrl from "./earth.jpg";
-    // >>>
+    import earthUrl from "/textures/earth.jpg";
 
     const SHADING_MODELS = { "Phong": 0, "Blinn-Phong": 1, "Radiometric Blinn-Phong": 2 };
-    // <<< NEW
     const FILTERS = { "Nearest (no mips)": 0, "Bilinear (no mips)": 1, "Trilinear": 2, "Anisotropic 16x": 3 };
-    // >>>
 
     const state = {
       spinSpeed: 1.0,
@@ -59,9 +55,7 @@
       specularColor: [1.0, 1.0, 1.0],
       ka: 1.0,
       kd: 0.8,
-      // <<< CHANGE
       ks: 0.15, // land isn't shiny
-      // >>>
       shininess: 32,
       lightIntensity: Math.PI, // E_L, only used by the radiometric model
       lightX: 1.5,
@@ -72,9 +66,7 @@
       // Material
       useFaceColors: true,
       materialColor: [0.9, 0.5, 0.2],
-      // <<< NEW
       filter: FILTERS["Trilinear"],
-      // >>>
 
       resetView() {
         state.fovDeg = 30;
@@ -110,13 +102,9 @@
     lightFolder.add(state, "orbitLight").name("Orbit Light");
 
     const materialFolder = gui.addFolder("Material");
-    // <<< CHANGE
     materialFolder.add(state, "useFaceColors").name("Use Texture");
-    // >>>
     materialFolder.addColor(state, "materialColor").name("Material Color");
-    // <<< NEW
     materialFolder.add(state, "filter", FILTERS).name("Texture Filter");
-    // >>>
 
     // --- Geometry ------------------------------------------------------
     // A "UV sphere": walk a grid of latitude (theta) and longitude (phi)
@@ -137,10 +125,8 @@
     // vector from the center out to the point) — no cross products needed.
 
     const R = .6;
-    // <<< CHANGE
     const LAT_BANDS = 64;  // finer than before so the coastline
     const LON_BANDS = 128; // silhouette looks round
-    // >>>
 
     const vertices = [];
 
@@ -156,14 +142,12 @@
 
         const color = [nx * .5 + 0.5, ny * .5 + 0.5, nz * .5 + 0.5];
 
-        // <<< CHANGE
         // Texture coordinates: u goes around (west -> east), v goes
         // north -> south, matching the image. u starts at 0.5 so longitude 0
         // (Greenwich) faces +Z; the sampler's 'repeat' handles u > 1.
         const u = /*0.5 +*/ j / LON_BANDS;
         const v = i / LAT_BANDS;
         vertices.push(R * nx, R * ny, R * nz, nx, ny, nz, ...color, u, v);
-        // >>>
       }
     }
 
@@ -183,10 +167,8 @@
       }
     }
 
-    // <<< CHANGE
     //  X Y Z | NX NY NZ | R G B | U V  -> 11 floats (44 bytes) per vertex
     const FLOATS_PER_VERTEX = 11;
-    // >>>
     const modelVertices = new Float32Array(vertices);
     const modelIndices = new Uint16Array(indices);
 
@@ -230,10 +212,8 @@
         lightIntensity : f32,
       };
       @group(0) @binding(0) var<uniform> u : Uniforms;
-      // <<< NEW
       @group(0) @binding(1) var earthSampler : sampler;
       @group(0) @binding(2) var earthTexture : texture_2d<f32>;
-      // >>>
 
       const PI = 3.14159265;
 
@@ -241,9 +221,7 @@
         @location(0) position : vec3<f32>,
         @location(1) normal   : vec3<f32>,
         @location(2) color    : vec3<f32>,
-        // <<< NEW
         @location(3) uv       : vec2<f32>,
-        // >>>
       };
 
       struct VertexOutput {
@@ -251,9 +229,7 @@
         @location(0) worldPos    : vec3<f32>,
         @location(1) worldNormal : vec3<f32>,
         @location(2) color       : vec3<f32>,
-        // <<< NEW
         @location(3) uv          : vec2<f32>,
-        // >>>
       };
 
       @vertex
@@ -264,9 +240,7 @@
         // w = 0: normals are directions, so translation must not apply.
         output.worldNormal = (u.normalMatrix * vec4<f32>(input.normal, 0.0)).xyz;
         output.color = input.color;
-        // <<< NEW
         output.uv = input.uv;
-        // >>>
         return output;
       }
 
@@ -277,15 +251,11 @@
         let L = normalize(u.lightPos - input.worldPos);   // toward light
         let V = normalize(u.eyePos - input.worldPos);     // toward eye
 
-        // <<< NEW
         let texColor = textureSample(earthTexture, earthSampler, input.uv).rgb;
-        // >>>
 
         var baseColor = u.materialColor;
         if (u.useFaceColors == 1u) {
-          // <<< CHANGE
           baseColor = texColor;
-          // >>>
         }
 
         let ambient = u.ka * u.ambientColor * baseColor;
@@ -377,7 +347,6 @@
 
         controller = new OrbitController(canvas, { distance: 3.5, rotX: 0.35, rotY: 0.45 });
         const mesh = new Mesh(device, { vertices: modelVertices, indices: modelIndices });
-        // <<< NEW
         viewFolder.add(controller, "distance", 1.5, 30, 0.1).name("Distance");
 
         // Load the image, upload it as mip level 0, then fill in the rest.
@@ -415,7 +384,6 @@
           { magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' },
           { magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', maxAnisotropy: 16 },
         ].map(desc => device.createSampler({ ...desc, addressModeU: 'repeat' }));
-        // >>>
 
         const uniformBuffer = device.createBuffer({
           size: UNIFORM_SIZE,
@@ -428,7 +396,6 @@
         const u32 = new Uint32Array(uniformData);
 
         const shaderModule = device.createShaderModule({ code: wgslSource });
-        // <<< CHANGE
         // Two new entries (1 and 2) for the sampler and the texture, and
         // one bind group per filter mode so the dropdown just picks one.
         const bindGroupLayout = device.createBindGroupLayout({
@@ -446,7 +413,6 @@
           { binding: 1, resource: sampler },
           { binding: 2, resource: earthTexture.createView() }]
         }));
-        // >>>
 
         const pipeline = device.createRenderPipeline({
           layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
@@ -458,10 +424,8 @@
               attributes: [
                 { shaderLocation: 0, offset: 0, format: 'float32x3' },  // position
                 { shaderLocation: 1, offset: 12, format: 'float32x3' }, // normal
-                // <<< CHANGE
                 { shaderLocation: 2, offset: 24, format: 'float32x3' }, // color
                 { shaderLocation: 3, offset: 36, format: 'float32x2' }  // uv
-                // >>>
               ]
             }]
           },
@@ -481,10 +445,8 @@
           fpsElementId: 'fps-label',
           onFrame: ({ renderPass, dt, aspect, time }) => {
             if (state.isSpinning && !controller.isDragging) {
-              // <<< CHANGE
               // Earth spins about its own axis only (no tumbling in X).
               controller.rotY += dt * 0.3 * state.spinSpeed;
-              // >>>
             }
 
             if (state.orbitLight) {
@@ -523,9 +485,7 @@
             device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
             renderPass.setPipeline(pipeline);
-            // <<< CHANGE
             renderPass.setBindGroup(0, bindGroups[state.filter]);
-            // >>>
             mesh.draw(renderPass);
           }
         });

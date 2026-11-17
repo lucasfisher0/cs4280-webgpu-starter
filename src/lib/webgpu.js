@@ -1,24 +1,32 @@
-export async function initializeWebGPU(canvasId) {
+/**
+ * @param {string | HTMLCanvasElement} canvasOrId - a canvas element, or its ID
+ * @param {Object} [options]
+ * @param {GPUDevice} [options.device] - reuse this device, so several canvases can share buffers and pipelines
+ */
+export async function initializeWebGPU(canvasOrId, { device: existingDevice } = {}) {
   // 1. Validate canvas presence
-  const canvas = document.getElementById(canvasId);
+  const canvas = typeof canvasOrId === "string" ? document.getElementById(canvasOrId) : canvasOrId;
   if (!canvas) {
-    throw new Error(`Canvas element with ID "${canvasId}" was not found.`);
+    throw new Error(`Canvas element with ID "${canvasOrId}" was not found.`);
   }
 
   if (!navigator.gpu) {
     throw new Error("WebGPU is not supported in this browser.");
   }
 
-  let adapter = await navigator.gpu.requestAdapter();
-  if (!adapter) {
-    adapter = await navigator.gpu.requestAdapter({ forceFallbackAdapter: true });
-  }
+  let device = existingDevice;
+  if (!device) {
+    let adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) {
+      adapter = await navigator.gpu.requestAdapter({ forceFallbackAdapter: true });
+    }
 
-  if (!adapter) {
-    throw new Error("No compatible GPU adapter found. Check if hardware acceleration is enabled.");
-  }
+    if (!adapter) {
+      throw new Error("No compatible GPU adapter found. Check if hardware acceleration is enabled.");
+    }
 
-  const device = await adapter.requestDevice();
+    device = await adapter.requestDevice();
+  }
 
   const context = canvas.getContext("webgpu");
   if (!context) {
@@ -109,7 +117,7 @@ export class Mesh {
 /**
  * 3. Render Attachment Manager: Handles High-DPI canvas scaling and depth textures.
  */
-export function createAttachmentManager(canvas, device) {
+export function createAttachmentManager(canvas, device, { depth = true } = {}) {
   let depthTexture = null;
 
   function update() {
@@ -120,15 +128,17 @@ export function createAttachmentManager(canvas, device) {
     // Also recreate when depthTexture is still null: if the canvas
     // already happened to have these exact pixel dimensions on the first
     // call, the size-changed check alone would never allocate it.
-    if (!depthTexture || canvas.width !== width || canvas.height !== height) {
+    if ((depth && !depthTexture) || canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
       if (depthTexture) depthTexture.destroy();
-      depthTexture = device.createTexture({
-        size: [width, height],
-        format: "depth24plus",
-        usage: GPUTextureUsage.RENDER_ATTACHMENT,
-      });
+      if (depth) {
+        depthTexture = device.createTexture({
+          size: [width, height],
+          format: "depth24plus",
+          usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+      }
     }
   }
 
@@ -138,6 +148,10 @@ export function createAttachmentManager(canvas, device) {
   return {
     getDepthView: () => depthTexture.createView(),
     getAspect: () => canvas.width / canvas.height,
+    destroy: () => {
+      window.removeEventListener("resize", update);
+      if (depthTexture) depthTexture.destroy();
+    },
   };
 }
 
@@ -188,6 +202,8 @@ export class OrbitController {
 /**
  * Executes a continuous animation loop, managing canvas sizing,
  * render passes, frame timing, and submission.
+ * Set `depth: false` for pipelines without a depth buffer.
+ * @returns {() => void} a function that stops the loop and releases its resources
  */
 export function animate({
   canvas,
@@ -195,14 +211,16 @@ export function animate({
   context,
   fpsElementId = null,
   clearColor = { r: 0.05, g: 0.05, b: 0.05, a: 1.0 },
+  depth = true,
   onFrame,
 }) {
-  const attachments = createAttachmentManager(canvas, device);
+  const attachments = createAttachmentManager(canvas, device, { depth });
   const fpsLabel = fpsElementId ? document.getElementById(fpsElementId) : null;
 
   let lastTime = performance.now();
   let frames = 0;
   let lastFpsTime = performance.now();
+  let frameId = 0;
 
   function loop(now) {
     const dt = (now - lastTime) * 0.001;
@@ -225,12 +243,14 @@ export function animate({
           storeOp: "store",
         },
       ],
-      depthStencilAttachment: {
-        view: attachments.getDepthView(),
-        depthClearValue: 1.0,
-        depthLoadOp: "clear",
-        depthStoreOp: "store",
-      },
+      ...(depth && {
+        depthStencilAttachment: {
+          view: attachments.getDepthView(),
+          depthClearValue: 1.0,
+          depthLoadOp: "clear",
+          depthStoreOp: "store",
+        },
+      }),
     });
 
     onFrame({
@@ -243,8 +263,13 @@ export function animate({
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
 
-    requestAnimationFrame(loop);
+    frameId = requestAnimationFrame(loop);
   }
 
-  requestAnimationFrame(loop);
+  frameId = requestAnimationFrame(loop);
+
+  return () => {
+    cancelAnimationFrame(frameId);
+    attachments.destroy();
+  };
 }

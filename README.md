@@ -39,12 +39,13 @@ examples directly.
 |---|---|
 | `npm run dev` | Start the Vite dev server. |
 | `npm run build` | Production build to `dist/` (every page listed in `vite.config.ts`'s `pages` array). |
-| `npm run preview` | Serve the production build locally. |
+| `npm run preview` | Serve the production build locally.|
 | `npm run test` | Run vitest. |
 | `npm run lint` | Check formatting/lint rules with Biome. |
 | `npm run lint:fix` | Same, applying safe fixes. |
 | `npm run ci` | `lint` + `test` + `build`, what CI runs. |
 <!-- `$env:DEBUG="vite:resolve"; npm run dev` -->
+
 ## Project structure
 
 ```
@@ -59,8 +60,9 @@ src/
 ├── style.css                    # shared dark-theme styling for the home page
 ├── lib/
 │   ├── math/                # vec2/vec3/vec4/mat4 (implemented) + transforms/curves (TODO stubs)
-│   ├── webgpu/               # context/buffer/shader/texture/geometry/blit helpers (implemented)
+│   ├── webgpu.js             # WebGPU setup, buffers, and the render loop (implemented)
 │   ├── scenegraph/            # SceneNode — construction is given; traversal is a TODO stub
+│   ├── obj-mtl.js            # OBJ and MTL parsers (implemented)
 │   └── image/                  # loadImage/sampleImage/storage (implemented) + palette/quantize/blockAverage/compare (TODO stubs) + ppm (mixed: encodePPM TODO, downloadBytes given)
 ├── activities/     # placeholder — one .keep file, nothing else yet
 └── assignments/    # placeholder — one .keep file, nothing else yet
@@ -69,7 +71,7 @@ src/
 Everything Vite serves/bundles lives under `src/`; `vite.config.ts`,
 `package.json`, `biome.json`, and the rest of the tooling config stay at
 the project root, outside it. The `@` import alias points at `src/`, so
-`@/lib/webgpu/context.js` resolves to `src/lib/webgpu/context.js`.
+`@/lib/webgpu.js` resolves to `src/lib/webgpu.js`.
 
 When an activity or assignment page does get built, it follows the same
 shape throughout this repo: `index.html` + `main.js` (+ `shaders.wgsl`
@@ -81,22 +83,17 @@ and `src/hello-triangle.js` are worked examples of exactly this shape.
 
 ## What's implemented vs. what's yours to build
 
-- **`src/lib/webgpu/`, `src/lib/image/{loadImage,sampleImage,storage}.js`**
+- **`src/lib/webgpu.js`, `src/lib/obj-mtl.js`, `src/lib/image/{loadImage,sampleImage,storage}.js`**
   — working infrastructure, not graded content.
-- **`src/lib/math/transforms.js`, `src/lib/math/curves.js`,
+- **`src/lib/math/transforms.js`,
   `src/lib/image/{palette,quantize,blockAverage,compare}.js`** — every
-  function throws `"not implemented"`. These *are* Assignment 1, 2, and 5's
-  actual deliverables; implementing them is most of what those three
+  function throws `"not implemented"`. These *are* Assignment 1 and 2's
+  actual deliverables; implementing them is most of what those two
   assignments ask for.
 - **`src/lib/image/ppm.js`** — `downloadBytes()` (triggers a browser file
   download) is given; `encodePPM()` throws — it's part of Assignment 1's
   deliverable too, alongside `palette`/`quantize`/`blockAverage`/`compare`
   above.
-- **`src/lib/scenegraph/SceneNode.js`** — construction/bookkeeping
-  (`addChild`, `setLocalTransform`, `find`) is given; `updateWorldTransforms()`
-  and `traverse()` throw — they're Assignment 4's "parent-child transform
-  inheritance, recursively traversed" deliverable. Assignment 7 reuses
-  the same file, so implementing it once for Assignment 4 covers both.
 - **`src/hello-canvas2d.js`, `src/hello-triangle.js`** — fully worked,
   always. Not graded; read them.
 
