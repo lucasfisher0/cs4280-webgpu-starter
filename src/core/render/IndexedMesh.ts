@@ -25,7 +25,7 @@ function interleaveVertexData(positions: Vec3[], normals: Vec3[], uvs: Vec2[]): 
 
   let dat: number[] = [];
   for (let i = 0; i < positions.length; i++) {
-    dat.push(...positions[i]!.toArray());
+    dat.push(...positions[i]!.toArray()); //TODO: Check strides
     dat.push(...normals[i]!.toArray());
     dat.push(...uvs[i]!.toArray());
   }
@@ -70,7 +70,7 @@ export class IndexedMesh extends Mesh {
     this.normals = this.normals.map((vec: Vec3) => vec.negate());
   }
 
-  override draw(pass: GPURenderPassEncoder, slot: number = 0)
+  override draw(queue: GPUQueue, pass: GPURenderPassEncoder, slot: number = 0)
   {
     pass.setVertexBuffer(slot, this.vertexBuffer);
     pass.setIndexBuffer(this.indexBuffer!, this.indexFormat);

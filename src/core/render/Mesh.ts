@@ -4,8 +4,10 @@ import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
 import * as Transform from "@/core/math/Transform.ts";
 import {createBuffer} from "@/lib/webgpu/buffers";
+import {EDrawLayer, type IDrawable} from "@/core/render/IDrawable.ts";
+import type {BoundingBox} from "@/core/raytracing/BVH.ts";
 
-export class Mesh implements Disposable {
+export class Mesh implements Disposable, IDrawable {
   #isDisposed = false;
   vertexBuffer: GPUBuffer;
   indexBuffer: GPUBuffer | undefined;
@@ -17,6 +19,7 @@ export class Mesh implements Disposable {
     this.indexBuffer = indexBuffer;
   }
 
+  // Disposable
   isValid(): boolean {
     return !(this.#isDisposed || !this.vertexBuffer || !this.indexBuffer);
   }
@@ -34,16 +37,32 @@ export class Mesh implements Disposable {
   [Symbol.dispose]() {
     this.dispose();
   }
+  // End Disposable
 
-  draw(pass: GPURenderPassEncoder, slot: number = 0) {
+  // IDrawable
+  visible: boolean = true;
+  isVisible(): boolean { return this.visible; }
+  getBounds(): BoundingBox | undefined {
+    return undefined;
+  }
+  drawLayer: EDrawLayer = EDrawLayer.WORLD;
+  getLayer(): EDrawLayer { return this.drawLayer; }
+  draw(queue: GPUQueue, pass: GPURenderPassEncoder, slot: number = 0) {
+    // Queue Commands - device.queue
+    // copyExternalImageToTexture(source: GPUCopyExternalImageSourceInfo, destination: GPUCopyExternalImageDestInfo, copySize: GPUExtent3D): void;
+    // writeBuffer(buffer: GPUBuffer, bufferOffset: GPUSize64, data: AllowSharedBufferSource, dataOffset?: GPUSize64, size?: GPUSize64): void;
+    // writeTexture(destination: GPUTexelCopyTextureInfo, data: AllowSharedBufferSource, dataLayout: GPUTexelCopyBufferLayout, size: GPUExtent3D): void;
+
+    // Render Pass Commands
+    // draw(vertexCount: GPUSize32, instanceCount?: GPUSize32, firstVertex?: GPUSize32, firstInstance?: GPUSize32): void;
+    // drawIndexed(indexCount: GPUSize32, instanceCount?: GPUSize32, firstIndex?: GPUSize32, baseVertex?: GPUSignedOffset32, firstInstance?: GPUSize32): void;
+    // drawIndexedIndirect(indirectBuffer: GPUBuffer, indirectOffset: GPUSize64): void;
+    // drawIndirect(indirectBuffer: GPUBuffer, indirectOffset: GPUSize64): void;
+    // setIndexBuffer(buffer: GPUBuffer, indexFormat: GPUIndexFormat, offset?: GPUSize64, size?: GPUSize64): void;
+    // setPipeline(pipeline: GPURenderPipeline): void;
+    // setVertexBuffer(slot: GPUIndex32, buffer: GPUBuffer | null, offset?: GPUSize64, size?: GPUSize64): void;
     throw new Error("Mesh-derived class does not implement draw function.");
   }
+  // End IDrawable
 }
 
-export class RawMesh extends Mesh {
-
-  override draw(pass: GPURenderPassEncoder, slot: number = 0) {
-   // TODO: Materials
-    pass.draw(slot);
-  }
-}

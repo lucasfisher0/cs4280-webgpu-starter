@@ -32,8 +32,6 @@ gui.add({callback: () => state.mode = Mode.DRIVE}, "callback").name("Design");
 
 
 async function loadCar() {
-
-
   const carOBJ = await fetch("a5/car.obj");
   let {positions, texcoords, normals, triangles, materialLibraries} = fromString(await carOBJ.text());
 
@@ -52,10 +50,12 @@ async function init() {
     const designCamera = new Camera({
       name: "Design Camera",
       canvasId: "gpu-canvas",
-      clipFar: 500,
       lockMovement: true,
-      lockRotation: true
+      lockRotation: true,
+      clipNear: 0.01,
+      clipFar: 20,
     }).addToNode(scene);
+    // designCamera.tetherRotation = new Vec3(0, Math.PI / 2, 0);
 
     const splineNode = new SplineNode(device, format, {
       name: "SplineNode"}
@@ -144,7 +144,7 @@ async function init() {
 
         designCamera.orthoBound = {
           width:  new Vec2(-10 * aspect, 10 * aspect),
-          height: new Vec2(-1.0, 1.0),
+          height: new Vec2(-10.0, 10.0),
         };
 
 

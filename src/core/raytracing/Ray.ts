@@ -12,7 +12,6 @@ export interface IRay {
 }
 
 export class ScreenRay implements IRay{
-
   origin: Vec3;
   direction: Vec3;
   length: number = 500;

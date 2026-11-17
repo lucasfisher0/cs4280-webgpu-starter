@@ -141,11 +141,7 @@ export class Camera extends SceneNode {
       worldPos = Vec3.add(worldPos, cameraPos);
 
       const dir = this.getForwardVector();
-
-      console.log("World position of click: " + worldPos.toArray())
-
-
-
+      // console.log("World position of click: " + worldPos.toArray())
 
     } else if (event.type === "pointerup") {
       this.dragging = false;

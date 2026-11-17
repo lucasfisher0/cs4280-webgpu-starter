@@ -63,7 +63,7 @@ export abstract class InputManager {
 
   public static registerPointer(
     id: string,
-    eventCallback: (event: PointerEvent, elem: HTMLElement, point: Vec3, dir: Vec3) => void) {
+    eventCallback: (event: PointerEvent, elem: HTMLElement, point: Vec3) => void) {
     const elem = InputManager.elementCache[id] ?? document.getElementById(id);
     if (!elem) {
       console.warn(`InputManager.registerPointer: Failed to find element with id '${id}'.`)

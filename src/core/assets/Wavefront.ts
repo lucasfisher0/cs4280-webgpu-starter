@@ -19,13 +19,13 @@ import {IndexedMesh} from "@/core/render/IndexedMesh.ts";
  * @d - Dissolve (opacity), also controlled by `Tr`, which is transparency (reversed values)
  * @map_Kd - Path to diffuse texture file
  */
-interface WavefrontMaterial {
+export interface WavefrontMaterial {
   Ka: Vec3;
   Kd: Vec3;
   Ks: Vec3;
   Ns: number;
   d: number;
-  map_Kd: string | null; // Technically supports map_ for other files, but that's for another time.
+  maps: Record<string, GPUTexture | string | null>;
 }
 
 /** The material used for faces with no `usemtl`, or a name the MTL file lacks. */
@@ -35,7 +35,7 @@ export const DEFAULT_MATERIAL: WavefrontMaterial = Object.freeze({
   Ks: Object.freeze(Vec3.Zero()),
   Ns: 0,
   d: 1,
-  map_Kd: null,
+  maps: {},
 });
 
 enum OBJ_TOKEN {
@@ -90,7 +90,7 @@ type TriangleModel = {
 
 const isToken = (tag: string | undefined, token: OBJ_TOKEN | MTL_TOKEN): boolean => (tag == token);
 
-export function fromString(text: string, computeNormals: boolean = true) {
+export function parseOBJ(text: string, computeNormals: boolean = true) {
   const positions: Vec3[] = [];
   const normals: Vec3[] = [];
   const texcoords: Vec2[] = [];
@@ -146,10 +146,6 @@ export function fromString(text: string, computeNormals: boolean = true) {
   return { positions, texcoords, normals, triangles, materialLibraries };
 }
 
-export function buildMeshFromTriangles(positions: Vec3[], texcoords: Vec2[], normals: Vec3[], triangles: Triangle[]) {
-
-}
-
 /**
  * Parses MTL text into `{ name: { Ka, Kd, Ks, Ns, d, map_Kd } }`. Missing
  * keys take their values from DEFAULT_MATERIAL. `Tr` is read as `1 − d`, and
@@ -181,7 +177,7 @@ export function parseMTL(text: string) {
     else if (isToken(tag, MTL_TOKEN.TRANSPARENCY))
       current.d = 1 - Number(values[0]);
     else if (isToken(tag, MTL_TOKEN.TEXTURE_DIFFUSE))
-      current.map_Kd = values.at(-1) ?? null;
+      current.maps["Kd"] = values.at(-1)!;
   }
   return materials;
 }
@@ -198,3 +194,4 @@ function faceNormal(points: Vec3[]): Vec3 {
   const length = normal.length();
   return length > 0 ? normal.normalize() : new Vec3(0, 1, 0); // degenerate face
 }
+
