@@ -53,6 +53,14 @@ export class Vec3 {
     return JSVec3.length(this.toArray());
   }
 
+  scale(s: number): Vec3 {
+    let jsVec = JSVec3.scale(this.toArray(), s) as [number, number, number];
+    this.x = jsVec[0];
+    this.y = jsVec[1];
+    this.z = jsVec[2];
+    return this;
+  }
+
   normalize() {
     let xyz = JSVec3.normalize(this.toArray());
     this.x = xyz[0] ?? this.x;
@@ -88,6 +96,17 @@ export class Vec3 {
 
   static cross(a: Vec3, b: Vec3): Vec3 {
     return Vec3.fromArray(JSVec3.cross(a.toArray(), b.toArray()));
+  }
+
+  /** Returns the "average" or center point for a list of Vec3. */
+  static average(arr: Vec3[]): Vec3 {
+    let c = Vec3.Zero();
+    arr.forEach((v: Vec3) => {v = Vec3.add(c, v)});
+
+    c.x = c.x / arr.length;
+    c.y = c.y / arr.length;
+    c.z = c.z / arr.length;
+    return c;
   }
 
   static lerp(a: Vec3, b: Vec3, t: number): Vec3 {

@@ -19,6 +19,7 @@ const pages = [
   "assignments/a3-sierpinski-gasket/index.html",
   "assignments/a4-instancing-textures/index.html",
   "assignments/a5-curves-splines/index.html",
+  "assignments/a6-raytracer/index.html",
   "assignments/template/index.html",
   "activities/sample-triangle/index.html",
   "activities/pyramid-mvp/index.html",
