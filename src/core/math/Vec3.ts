@@ -17,7 +17,11 @@ export class Vec3 {
   }
 
   static Zero(): Vec3 {
-    return new Vec3(0, 0, 0);
+    return new Vec3(0);
+  }
+
+  static One(): Vec3 {
+    return new Vec3(1);
   }
 
   // Converts a flat array of numbers to Vec3

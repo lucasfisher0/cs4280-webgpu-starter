@@ -3,7 +3,7 @@ import {Vec2} from "@/core/math/Vec2";
 import {Vec3} from "@/core/math/Vec3";
 import {Vec4} from "@/core/math/Vec4";
 import {Mat4} from "@/core/math/Mat4";
-import * as Transform from "@/core/math/Transform.ts"
+import * as Transforms from "@/core/math/Transforms.ts"
 import {compareMatrix, compareMatrixError, stringifyMatrix} from "@/core/debug/Mat4";
 
 function deg2rad(deg: number) {

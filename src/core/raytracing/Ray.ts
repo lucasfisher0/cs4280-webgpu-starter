@@ -2,7 +2,7 @@ import {Vec2} from "@/core/math/Vec2.ts";
 import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
-import * as Transform from "@/core/math/Transform.ts"
+import * as Transforms from "@/core/math/Transforms.ts"
 import {type Shape} from "@/core/collision/Shapes.ts"
 import * as Shapes from "@/core/collision/Shapes.ts"
 

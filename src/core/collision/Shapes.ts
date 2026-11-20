@@ -2,7 +2,7 @@ import {Vec2} from "@/core/math/Vec2.ts";
 import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
-import * as Transform from "@/core/math/Transform.ts"
+import * as Transforms from "@/core/math/Transforms.ts"
 import {Ray, HitRecord} from "@/core/raytracing/Ray.ts";
 
 export type BoundingBox = {
@@ -60,6 +60,8 @@ const AXES: readonly AxisAccessor[] = [
   { name: "z", get: v => v.z, set: (v, n) => { v.z = n; } },
 ];
 
+const TOLERANCE = 1e-4;
+
 export interface Shape {
   getBounds(): Box;
   hit(ray: Ray, t0: number, t1: number): HitRecord | null;
@@ -86,10 +88,8 @@ class Box implements Shape {
   }
   /** Tests collision between shape and ray. */
   hit(ray: Ray, t0: number, t1: number) {
-    const TOLERANCE = 1e-4;
     let min = new Vec3(-Infinity);
     let max = new Vec3(Infinity);
-
     // Check if ray is inside box
     let insideBox = true;
     for (const axis of AXES) {
@@ -199,12 +199,45 @@ class Triangle implements Shape {
   }
   /** Tests collision between shape and ray. */
   hit(ray: Ray, t0: number, t1: number): HitRecord | null {
-    return null;
+    let min = new Vec3(-Infinity);
+    let max = new Vec3(Infinity);
 
+    //e+td = a + β(b−a) + γ(c−a)
+    let a = this.#points[0].x - this.#points[1].x;
+    let b = this.#points[0].y - this.#points[1].y;
+    let c = this.#points[0].z - this.#points[1].z;
+    let d = this.#points[0].x - this.#points[2].x;
+    let e = this.#points[0].y - this.#points[2].y;
+    let f = this.#points[0].z - this.#points[2].z;
+    let g = ray.direction.x;
+    let h = ray.direction.y;
+    let i = ray.direction.z;
 
-    // @ts-ignore
-    let normal = Vec3.triangleNormal(this.#points[0], this.#points[1], this.#points[2]);
-    return new HitRecord(this, null, null, normal);
+    let j = this.#points[0].x - ray.origin.x;
+    let k = this.#points[0].y - ray.origin.y;
+    let l = this.#points[0].z - ray.origin.z;
+
+    // M = a(ei−hf) + b(gf−di) + c(dh−eg)
+    let M = a*(e*i - h*f) + b*(g*f - d*i) + c*(d*h - e*g);
+
+    // Compute t
+    const t = -1*(f*(a*k-j*b) + e*(j*c-a*l) + d*(b*l-k*c))/M
+    if (t < t0 || t > t1)
+      return null;
+
+    // Compute γ (a->c)
+    const gamma = (i*(a*k-j*b) + h*(j*c-a*l) + g*(b*l-k*c))/M
+    if (gamma < 0 || gamma > 1)
+      return null;
+
+    // Compute β (a->b)
+    const beta = (j*(e*i-h*f) + k*(g*f)-d*i) + l*(d*h-e*g)/M
+    if (beta < 0 || beta > (1 - gamma))
+      return null;
+
+    const position = ray.evaluate(t);
+    const normal = Vec3.triangleNormal(this.#points[0], this.#points[1], this.#points[2]);
+    return new HitRecord(this, t, position, normal);
   }
 
   constructor(points: TrianglePoints) {

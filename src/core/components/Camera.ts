@@ -2,11 +2,11 @@ import {Vec2} from "@/core/math/Vec2.ts";
 import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
-import * as Transform from "@/core/math/Transform.ts"
+import * as Transforms from "@/core/math/Transforms.ts"
 
 import {SceneNode, type SceneNodeDescriptor} from "@/core/scenegraph/SceneNode";
 import {InputManager} from "@/core/InputManager.ts";
-import {perspective} from "@/core/math/Transform.ts";
+import {perspective} from "@/core/math/Transforms.ts";
 
 /* export enum FOV_TYPE {
   HORIZONTAL,
@@ -137,7 +137,7 @@ export class Camera extends SceneNode {
       let proj = this.getProjection().invert();
 
       const cameraPos = this.getCameraPosition();
-      let worldPos = Mat4.multiplyAll([proj, view, Transform.translateVec3(point)]).position();
+      let worldPos = Mat4.multiplyAll([proj, view, Transforms.translateVec3(point)]).position();
       worldPos = Vec3.add(worldPos, cameraPos);
 
       const dir = this.getForwardVector();
@@ -157,13 +157,13 @@ export class Camera extends SceneNode {
   /** Returns camera position, including the boom. */
   getCameraPosition(): Vec3 {
     if (this.tetherDistance <= 0)
-      return this.worldTransform.position();
+      return this.transform.position();
 
     // Compose the real node position with the camera boom
-    let origin: Mat4 = super.worldTransform;
+    let origin: Mat4 = super.tra;
     let tether: Mat4 = Mat4.multiply(
-      Transform.fromEulerZYX(this.tetherRotation.z, this.tetherRotation.y, this.tetherRotation.x),
-      Transform.translate(0, 0, -this.tetherDistance)
+      Transforms.fromEulerZYX(this.tetherRotation.z, this.tetherRotation.y, this.tetherRotation.x),
+      Transforms.translate(0, 0, -this.tetherDistance)
     );
 
     return Mat4.multiply(tether, origin).position();
@@ -189,7 +189,7 @@ export class Camera extends SceneNode {
 
   /** Returns camera view matrix. **/
   getViewMatrix(target?: Vec3): Mat4 {
-    return Transform.lookAt(
+    return Transforms.lookAt(
       this.getCameraPosition(),
       target ?? Vec3.add(this.getCameraPosition(), this.getForwardVector()),
       new Vec3(0, 1, 0)
@@ -213,7 +213,7 @@ export class Camera extends SceneNode {
       if (!this.orthoBound)
         console.error("Camera.getProjection(): Orthographic projection did not have a bound!");
 
-      return Transform.ortho(
+      return Transforms.ortho(
         this.orthoBound?.width.x ?? -1.0,
         this.orthoBound?.width.y ?? 1.0,
         this.orthoBound?.height.x ?? -1.0,
@@ -243,8 +243,8 @@ export class Camera extends SceneNode {
     const r = this.getRightVector();
 
     let translate = Mat4.multiply(
-      Transform.translateVec3(Vec3.scale(r, move.y)),
-      Transform.translateVec3(Vec3.scale(f, move.x)));
+      Transforms.translateVec3(Vec3.scale(r, move.y)),
+      Transforms.translateVec3(Vec3.scale(f, move.x)));
 
     this.transform = Mat4.multiply(
       translate,

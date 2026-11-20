@@ -18,7 +18,7 @@ Local -> World -> View -> NDC (Normalized Device Coordinates)
 
 
 ## Assignment 6
-- [ ] SceneNode: Transform should now become a composite of separate TRS
+- [X] SceneNode: Transform should now become a composite of separate TRS
 - [ ] Test Ray->Plane
 - [ ] Implement ray collisions for sphere and triangle
 - [ ] GUI setup, don't hook up yet
@@ -29,5 +29,8 @@ Local -> World -> View -> NDC (Normalized Device Coordinates)
 - [ ] Finalize camera/ray generation
 - [ ] Test simple render with just the room boxes
 - [ ] Import the car model
+- [ ] Shading
+- [ ] Shadows
+- [ ] Reflections
 - [ ] Complete GUI connections
 

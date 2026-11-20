@@ -1,7 +1,7 @@
 import * as JSMat4 from "@/lib/math/mat4.js";
 import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
-import * as Transform from "@/core/math/Transform.ts";
+import * as Transforms from "@/core/math/Transforms.ts";
 
 interface SVDResult {
   U: Mat4;
@@ -100,7 +100,7 @@ export class Mat4 {
 
   /** Returns translation component as a standalone matrix. */
   translation(): Mat4 {
-    return Transform.translate(this.arr[12]!, this.arr[13]!, this.arr[14]!);
+    return Transforms.translate(this.arr[12]!, this.arr[13]!, this.arr[14]!);
   };
 
   /** Returns rotation component as a standalone matrix.
@@ -114,7 +114,7 @@ export class Mat4 {
    * @deprecated Requires SVD implementation for original axes.*/
   scale(): Mat4 {
     const scale = this.scale3();
-    return Transform.scale(scale.x, scale.y, scale.z)
+    return Transforms.scale(scale.x, scale.y, scale.z)
   };
 
   /** Transforms a `Vec3` point (implicit `w = 1`) by `m`, returning the full `Vec4` quadruple *before* any perspective divide. */
