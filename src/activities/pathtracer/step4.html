@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Path Tracer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-zinc-800 min-h-screen flex flex-col items-center p-6 font-sans">
+  <header class="text-center mb-4">
+    <h1 class="text-2xl font-bold text-white">Path Tracer</h1>
+    <p class="text-xs text-zinc-400 mt-1">Step 4: Fresnel: the metal ball reflects by Schlick; the glass ball reflects
+      or refracts, bends by Snell's law, and is tinted by Beer's law</p>
+  </header>
+
+  <main class="w-full max-w-lg border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+    <canvas id="gpu-canvas" width="400" height="400" class="w-full aspect-square block bg-black"></canvas>
+    <div id="info" class="px-4 py-2 border-t border-zinc-800 text-xs text-zinc-500"></div>
+  </main>
+
+  <nav class="w-full max-w-lg flex justify-between mt-4">
+    <a href="./step3.html" class="text-sm text-sky-400 hover:text-sky-300">&larr; Step 3</a>
+    <a href="./step5.html" class="text-sm text-sky-400 hover:text-sky-300">Step 5 &rarr;</a>
+  </nav>
+
+  <script type="module">
+    import GUI from "lil-gui";
+    import { initializeWebGPU } from "@/lib/webgpu.js";
+
+    // Image size, baked into the shaders as text.
+    const W = 400, H = 400;
+
+    const state = {
+      exposure: 1.0,    // display brightness
+      maxDepth: 8,      // max bounces per path (glass needs a few)
+      maxFrames: 1024,  // stop after this many samples per pixel
+    };
+
+    // ======================= WGSL =======================
+
+    // Uniforms. Each vec3 is padded to 16 bytes by the 4-byte field after it:
+    //   0 e (eye) vec3,   12 tanHalf f32
+    //  16 u vec3,         28 exposure f32
+    //  32 v vec3,         44 frame u32
+    //  48 w vec3,         60 maxDepth u32
+    const wgslParams = /* wgsl */ `
+      struct Params {
+        e: vec3f, tanHalf: f32,
+        u: vec3f, exposure: f32,
+        v: vec3f, frame: u32,
+        w: vec3f, maxDepth: u32,
+      };
+      @group(0) @binding(0) var<uniform> P: Params;
+    `;
+
+    // ---- Random numbers (PCG hash), as in Module 11 ----
+    const wgslRandom = /* wgsl */ `
+      fn pcg(v: u32) -> u32 {
+        let state = v * 747796405u + 2891336453u;
+        let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+        return (word >> 22u) ^ word;
+      }
+      // Uniform in [0, 1)
+      fn rand(seed: ptr<function, u32>) -> f32 {
+        *seed = pcg(*seed);
+        return f32(*seed >> 8u) / 16777216.0;
+      }
+    `;
+
+    // ---- The scene: a room of 6 quads, 2 spheres and a box ----
+    const wgslScene = /* wgsl */ `
+      const PI = 3.14159265;
+      const EPS = 1e-3;
+
+      // How a material scatters light.
+      const DIFFUSE = 0u;
+      const METAL = 1u;     // smooth metal: mirror reflection tinted by its color
+      const GLASS = 2u;
+      const ABSORB = vec3f(0.45, 0.85, 0.6);   // Beer's a: fraction left per unit length
+
+      struct Material { albedo: vec3f, kind: u32, emitted: vec3f };
+      struct Quad { corner: vec3f, e1: vec3f, e2: vec3f, mat: u32 };
+      struct Sphere { center: vec3f, radius: f32, mat: u32 };
+      struct Box { center: vec3f, half: vec3f, angle: f32, mat: u32 };   // turned by angle about y
+      struct Ray { o: vec3f, d: vec3f };
+      struct Hit { t: f32, n: vec3f, mat: i32 };   // mat = -1: missed
+
+      var<private> materials: array<Material, 7> = array<Material, 7>(
+        Material(vec3f(0.73), DIFFUSE, vec3f(0.0)),               // 0 white
+        Material(vec3f(0.65, 0.06, 0.05), DIFFUSE, vec3f(0.0)),   // 1 red
+        Material(vec3f(0.12, 0.45, 0.15), DIFFUSE, vec3f(0.0)),   // 2 green
+        Material(vec3f(0.0), DIFFUSE, vec3f(40.0, 35.0, 26.0)),   // 3 light panel (sized for the 3x3x3 room)
+        Material(vec3f(0.95), METAL, vec3f(0.0)),                 // 4 big ball: silver mirror
+        Material(vec3f(1.0), GLASS, vec3f(0.0)),                  // 5 middle ball: glass
+        Material(vec3f(0.15, 0.3, 0.75), DIFFUSE, vec3f(0.0)));    // 6 cube: blue paint
+
+      // The room is x in [-1.5, 1.5], y in [0, 3], z in [-1.5, 1.5]; its front is open.
+      const LIGHT = 5;   // index of the light panel in quads
+      var<private> quads: array<Quad, 6> = array<Quad, 6>(
+        Quad(vec3f(-1.5, 0.0, -1.5), vec3f(3.0, 0.0, 0.0), vec3f(0.0, 0.0, 3.0), 0u),   // floor
+        Quad(vec3f(-1.5, 3.0, -1.5), vec3f(3.0, 0.0, 0.0), vec3f(0.0, 0.0, 3.0), 0u),   // ceiling
+        Quad(vec3f(-1.5, 0.0, -1.5), vec3f(3.0, 0.0, 0.0), vec3f(0.0, 3.0, 0.0), 0u),   // back
+        Quad(vec3f(-1.5, 0.0, -1.5), vec3f(0.0, 0.0, 3.0), vec3f(0.0, 3.0, 0.0), 1u),   // left
+        Quad(vec3f(1.5, 0.0, -1.5), vec3f(0.0, 0.0, 3.0), vec3f(0.0, 3.0, 0.0), 2u),    // right
+        Quad(vec3f(-0.4, 2.99, -0.4), vec3f(0.8, 0.0, 0.0), vec3f(0.0, 0.0, 0.8), 3u)); // light (faces down)
+
+      var<private> spheres: array<Sphere, 2> = array<Sphere, 2>(
+        Sphere(vec3f(-0.7, 0.5, -0.5), 0.5, 4u),
+        Sphere(vec3f(0.65, 0.45, -0.1), 0.45, 5u));
+
+      // A 0.6 painted cube resting on the floor, turned 30 degrees.
+      var<private> boxes: array<Box, 1> = array<Box, 1>(
+        Box(vec3f(-0.1, 0.3, 0.8), vec3f(0.3), radians(30.0), 6u));
+
+      // Ray-parallelogram: hit the plane, then check both edge coordinates are in [0, 1].
+      fn hitQuad(q: Quad, r: Ray, tmax: f32) -> f32 {
+        let n = cross(q.e1, q.e2);
+        let denom = dot(n, r.d);
+        if (abs(denom) < 1e-8) { return -1.0; }
+        let t = dot(q.corner - r.o, n) / denom;
+        if (t < EPS || t > tmax) { return -1.0; }
+        let rel = r.o + t * r.d - q.corner;
+        let a = dot(rel, q.e1) / dot(q.e1, q.e1);
+        let b = dot(rel, q.e2) / dot(q.e2, q.e2);
+        if (a < 0.0 || a > 1.0 || b < 0.0 || b > 1.0) { return -1.0; }
+        return t;
+      }
+
+      // Ray-sphere (Module 10), with a unit-length direction.
+      fn hitSphere(s: Sphere, r: Ray, tmax: f32) -> f32 {
+        let ec = r.o - s.center;
+        let B = dot(r.d, ec);
+        let disc = B * B - (dot(ec, ec) - s.radius * s.radius);
+        if (disc < 0.0) { return -1.0; }
+        var t = -B - sqrt(disc);
+        if (t < EPS) { t = -B + sqrt(disc); }   // ray starts inside the sphere
+        if (t < EPS || t > tmax) { return -1.0; }
+        return t;
+      }
+
+      // Rotate v by angle a about the y axis.
+      fn rotY(v: vec3f, a: f32) -> vec3f {
+        let c = cos(a);
+        let s = sin(a);
+        return vec3f(c * v.x + s * v.z, v.y, -s * v.x + c * v.z);
+      }
+
+      // Ray-box (Module 10's slabs), after turning the ray into the box's own frame.
+      fn hitBox(b: Box, r: Ray, tmax: f32) -> Hit {
+        let miss = Hit(-1.0, vec3f(0.0), -1);
+        let o = rotY(r.o - b.center, -b.angle);
+        let d = rotY(r.d, -b.angle);
+        let inv = 1.0 / select(d, vec3f(1e-8), abs(d) < vec3f(1e-8));   // avoid dividing by 0
+        let t1 = (-b.half - o) * inv;
+        let t2 = (b.half - o) * inv;
+        let tlo = min(t1, t2);
+        let thi = max(t1, t2);
+        let tnear = max(max(tlo.x, tlo.y), tlo.z);
+        let tfar = min(min(thi.x, thi.y), thi.z);
+        if (tnear > tfar) { return miss; }
+        let t = select(tfar, tnear, tnear > EPS);   // tfar when the ray starts inside
+        if (t < EPS || t > tmax) { return miss; }
+        // Face normal: the axis where the hit point is farthest out (relative to the size).
+        let p = (o + t * d) / b.half;
+        let a = abs(p);
+        var n = vec3f(0.0, 0.0, sign(p.z));
+        if (a.x >= a.y && a.x >= a.z) {
+          n = vec3f(sign(p.x), 0.0, 0.0);
+        } else if (a.y >= a.z) {
+          n = vec3f(0.0, sign(p.y), 0.0);
+        }
+        return Hit(t, rotY(n, b.angle), i32(b.mat));   // normal back to world space
+      }
+
+      // Closest hit over everything in the scene.
+      fn sceneHit(r: Ray, tmaxIn: f32) -> Hit {
+        var h = Hit(-1.0, vec3f(0.0), -1);
+        var tmax = tmaxIn;
+        for (var i = 0; i < 6; i++) {
+          let t = hitQuad(quads[i], r, tmax);
+          if (t > 0.0) { tmax = t; h = Hit(t, normalize(cross(quads[i].e1, quads[i].e2)), i32(quads[i].mat)); }
+        }
+        for (var i = 0; i < 2; i++) {
+          let t = hitSphere(spheres[i], r, tmax);
+          if (t > 0.0) { tmax = t; h = Hit(t, (r.o + t * r.d - spheres[i].center) / spheres[i].radius, i32(spheres[i].mat)); }
+        }
+        for (var i = 0; i < 1; i++) {
+          let hb = hitBox(boxes[i], r, tmax);
+          if (hb.t > 0.0) { tmax = hb.t; h = hb; }
+        }
+        return h;
+      }
+    `;
+
+    // ---- Direct lighting from the area light ----
+    // Area form of the transport equation, for the light panel only:
+    //   L = ∫ ρ L_e v(x, x') cosθ cosθ' / |x - x'|²  dA'
+    // Estimate it with ONE uniform point x' on the panel: p = 1/area, and
+    // dividing by p is multiplying by the area. ρ = R/π (Lambert).
+    const wgslDirectLight = /* wgsl */ `
+      fn directLight(x: vec3f, n: vec3f, albedo: vec3f, seed: ptr<function, u32>) -> vec3f {
+        let light = quads[LIGHT];
+        let xl = light.corner + rand(seed) * light.e1 + rand(seed) * light.e2;
+        let toL = xl - x;
+        let d2 = dot(toL, toL);
+        let l = toL * inverseSqrt(d2);
+        let lightN = normalize(cross(light.e1, light.e2));
+        let cosI = dot(n, l);          // at the surface
+        let cosL = -dot(lightN, l);    // at the light
+        if (cosI <= 0.0 || cosL <= 0.0) { return vec3f(0.0); }
+        // Visibility v(x, x'): a shadow ray that stops just short of the light.
+        let blocker = sceneHit(Ray(x, l), sqrt(d2) - EPS);
+        if (blocker.mat >= 0) { return vec3f(0.0); }
+        let area = length(cross(light.e1, light.e2));
+        return (albedo / PI) * materials[light.mat].emitted * cosI * cosL / d2 * area;
+      }
+    `;
+
+    // ---- Cosine-weighted hemisphere sampling (Module 11) ----
+    const wgslSampling = /* wgsl */ `
+      // A direction around +z with pdf cos(theta) / pi.
+      fn sampleCosineHemisphere(xi: vec2f) -> vec3f {
+        let phi = 2.0 * PI * xi.x;
+        let s = sqrt(xi.y);
+        return vec3f(cos(phi) * s, sin(phi) * s, sqrt(1.0 - xi.y));
+      }
+      // Rotate a +z-centered vector so +z becomes the normal n.
+      fn toWorld(v: vec3f, n: vec3f) -> vec3f {
+        let a = select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), abs(n.x) > 0.9);
+        let t = normalize(cross(a, n));
+        return v.x * t + v.y * cross(n, t) + v.z * n;
+      }
+    `;
+
+    // ---- Glass: Fresnel (Schlick), Snell (refract), Beer ----
+    // Reflect with probability R, refract with probability 1 - R. The
+    // weights R/R and (1-R)/(1-R) are 1, so beta changes only by Beer's law.
+    const wgslGlass = /* wgsl */ `
+      fn schlick(c: f32, R0: f32) -> f32 {
+        return R0 + (1.0 - R0) * pow(1.0 - min(c, 1.0), 5.0);   // min: pow needs a base >= 0
+      }
+
+      fn glassBounce(ray: Ray, h: Hit, x: vec3f,
+                     seed: ptr<function, u32>, beta: ptr<function, vec3f>) -> Ray {
+        let entering = dot(ray.d, h.n) < 0.0;            // h.n points out of the glass
+        // Leaving: the ray just traveled h.t inside, so apply I = I0 a^s.
+        if (!entering) { *beta *= pow(ABSORB, vec3f(h.t)); }
+        let nn = select(-h.n, h.n, entering);            // normal facing the ray
+        let eta = select(1.5, 1.0 / 1.5, entering);      // n_i / n_t
+        let t = refract(ray.d, nn, eta);                 // built-in; zero on total internal reflection
+        let tir = all(t == vec3f(0.0));
+        let cosAir = select(-dot(t, nn), -dot(ray.d, nn), entering);   // Schlick uses the air side
+        let R0 = 0.04;                                   // ((1.5 - 1) / (1.5 + 1))^2
+        let reflects = tir || rand(seed) < schlick(cosAir, R0);
+        return Ray(x, select(t, reflect(ray.d, nn), reflects));
+      }
+    `;
+
+    // ---- Tracing: a loop instead of recursion ----
+    // The rendering equation  L = Le + ∫ ρ L_f cosθ dσ,  estimated with ONE
+    // random direction q per bounce:  L ≈ Le + (ρ cosθ / p) · L_f(q).
+    // beta (the throughput) is the product of all the ρ cosθ / p so far.
+    const wgslRadiance = /* wgsl */ `
+      fn radiance(primary: Ray, seed: ptr<function, u32>) -> vec3f {
+        var ray = primary;
+        var L = vec3f(0.0);
+        var beta = vec3f(1.0);
+        var specular = true;   // camera ray, or just left a mirror or glass: no directLight ran
+        for (var depth = 0u; depth < P.maxDepth; depth++) {
+          let h = sceneHit(ray, 1e30);
+          if (h.mat < 0) { break; }                  // out the open front: black
+          let m = materials[h.mat];
+          let x = ray.o + h.t * ray.d;
+
+          // Hit the light panel. After a diffuse bounce, directLight already
+          // counted it at the previous hit -- counting it again doubles it.
+          if (any(m.emitted > vec3f(0.0))) {
+            if (specular && dot(ray.d, h.n) < 0.0) { L += beta * m.emitted; }
+            break;
+          }
+
+          if (m.kind == METAL) {
+            // Smooth metal: Schlick with R0 = the metal's color, per channel.
+            // Reflectance rises toward white at grazing angles.
+            let c = abs(dot(ray.d, h.n));
+            beta *= m.albedo + (1.0 - m.albedo) * pow(1.0 - min(c, 1.0), 5.0);
+            ray = Ray(x, reflect(ray.d, h.n));
+            specular = true;
+          } else if (m.kind == GLASS) {
+            ray = glassBounce(ray, h, x, seed, &beta);
+            specular = true;
+          } else {
+            let n = select(h.n, -h.n, dot(h.n, ray.d) > 0.0);   // normal facing the ray
+            // Light arriving straight from the panel, before beta changes.
+            L += beta * directLight(x, n, m.albedo, seed);
+            // Then keep going in a random direction. With p = cosθ/π and
+            // ρ = albedo/π, ρ cosθ / p = albedo: the π and the cosine cancel.
+            beta *= m.albedo;
+            let xi = vec2f(rand(seed), rand(seed));
+            ray = Ray(x, toWorld(sampleCosineHemisphere(xi), n));
+            specular = false;
+          }
+        }
+        return L;
+      }
+    `;
+
+    // ---- Camera ray through pixel (px, py) in [-1, 1] ----
+    const wgslCamera = /* wgsl */ `
+      fn cameraRay(px: f32, py: f32) -> Ray {
+        let dir = normalize(-P.w + px * P.tanHalf * P.u + py * P.tanHalf * P.v);
+        return Ray(P.e, dir);
+      }
+    `;
+
+    // ---- Compute: one thread per pixel ----
+    const wgslMain = /* wgsl */ `
+      @group(0) @binding(1) var<storage, read_write> accum: array<vec4f>;
+
+      @compute @workgroup_size(8, 8)
+      fn cs_main(@builtin(global_invocation_id) id: vec3u) {
+        if (id.x >= ${W}u || id.y >= ${H}u) { return; }
+        // A different random stream for every pixel and every frame.
+        var seed = pcg(id.x + pcg(id.y + pcg(P.frame)));
+        // Jitter: a random point inside the pixel (antialiasing).
+        let px = (f32(id.x) + rand(&seed)) / ${W}.0 * 2.0 - 1.0;
+        let py = 1.0 - (f32(id.y) + rand(&seed)) / ${H}.0 * 2.0;
+        let c = radiance(cameraRay(px, py), &seed);
+        let i = id.y * ${W}u + id.x;
+        // Running mean of all samples so far; frame 0 overwrites the old image.
+        // Kept in floating point: radiance is not limited to [0, 1].
+        accum[i] += (vec4f(c, 1.0) - accum[i]) / f32(P.frame + 1u);
+      }
+    `;
+
+    // ---- Display: full-screen triangle that reads the image buffer ----
+    const wgslDisplay = /* wgsl */ `
+      @vertex
+      fn vs_main(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+        var pos = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+        return vec4f(pos[i], 0.0, 1.0);
+      }
+
+      // Same binding as accum, but read-only; the two are never used by one entry point.
+      @group(0) @binding(1) var<storage, read> image: array<vec4f>;
+
+      @fragment
+      fn fs_display(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+        let c = P.exposure * image[u32(pos.y) * ${W}u + u32(pos.x)].rgb;
+        let mapped = c / (1.0 + c);                          // Reinhard: compresses, never clips
+        return vec4f(pow(mapped, vec3f(1.0 / 2.2)), 1.0);    // gamma (canvas is not sRGB)
+      }
+    `;
+
+    const shaderCode = [wgslParams, wgslRandom, wgslScene, wgslDirectLight, wgslSampling, wgslGlass, wgslRadiance,
+      wgslCamera, wgslMain, wgslDisplay].join("\n");
+
+    // ======================= Host =======================
+
+    const gui = new GUI({ title: "Controls" });
+    gui.add(state, "exposure", 0.25, 4, 0.05).name("Exposure");
+    gui.add(state, "maxDepth", 1, 12, 1).name("Max bounces").onChange(restart);
+    gui.add(state, "maxFrames", 1, 4096, 1).name("Stop after (spp)");
+
+    let frame = 0;
+    let startTime = performance.now();
+    function restart() {
+      frame = 0;
+      startTime = performance.now();
+    }
+
+    async function init() {
+      try {
+        const { device, context, format } = await initializeWebGPU("gpu-canvas");
+
+        const module = device.createShaderModule({ code: shaderCode });
+        const computePipeline = device.createComputePipeline({
+          layout: "auto",
+          compute: { module, entryPoint: "cs_main" },
+        });
+        const displayPipeline = device.createRenderPipeline({
+          layout: "auto",
+          vertex: { module, entryPoint: "vs_main" },
+          fragment: { module, entryPoint: "fs_display", targets: [{ format }] },
+        });
+
+        // 64 bytes of fields; 80 leaves room for the ones later steps add.
+        const PARAMS_SIZE = 80;
+        const paramsBuffer = device.createBuffer({
+          size: PARAMS_SIZE,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        // One vec4f (16 bytes) of color per pixel.
+        const accumBuffer = device.createBuffer({ size: W * H * 16, usage: GPUBufferUsage.STORAGE });
+
+        const entries = [
+          { binding: 0, resource: { buffer: paramsBuffer } },
+          { binding: 1, resource: { buffer: accumBuffer } },
+        ];
+        const computeBG = device.createBindGroup({ layout: computePipeline.getBindGroupLayout(0), entries });
+        const displayBG = device.createBindGroup({ layout: displayPipeline.getBindGroupLayout(0), entries });
+
+        const data = new ArrayBuffer(PARAMS_SIZE);
+        const f32 = new Float32Array(data);
+        const u32 = new Uint32Array(data);
+        const info = document.getElementById("info");
+
+        function step() {
+          // Camera at z = 5.9 looking down -z into the room.
+          f32.set([0, 1.5, 5.9, 0.34], 0);                     // e, tanHalf
+          f32.set([1, 0, 0, state.exposure], 4);             // u, exposure
+          f32.set([0, 1, 0], 8); u32[11] = frame;            // v, frame
+          f32.set([0, 0, 1], 12); u32[15] = state.maxDepth;  // w, maxDepth
+          device.queue.writeBuffer(paramsBuffer, 0, data);
+
+          const encoder = device.createCommandEncoder();
+
+          if (frame < state.maxFrames) {
+            const compute = encoder.beginComputePass();
+            compute.setPipeline(computePipeline);
+            compute.setBindGroup(0, computeBG);
+            compute.dispatchWorkgroups(Math.ceil(W / 8), Math.ceil(H / 8));
+            compute.end();
+            frame++;
+            const seconds = ((performance.now() - startTime) / 1000).toFixed(1);
+            info.textContent = `${frame} samples per pixel · ${seconds} s`;
+          }
+
+          // Always redraw, so exposure works even after the compute pass stops.
+          const pass = encoder.beginRenderPass({
+            colorAttachments: [{
+              view: context.getCurrentTexture().createView(),
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+              loadOp: "clear",
+              storeOp: "store",
+            }],
+          });
+          pass.setPipeline(displayPipeline);
+          pass.setBindGroup(0, displayBG);
+          pass.draw(3);
+          pass.end();
+
+          device.queue.submit([encoder.finish()]);
+          requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      } catch (err) {
+        console.error("WebGPU Initialization Error:", err);
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+
+</html>

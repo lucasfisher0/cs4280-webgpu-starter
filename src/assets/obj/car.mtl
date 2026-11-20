@@ -1,0 +1,26 @@
+# Materials for car.obj
+
+newmtl Body
+Kd 0.82 0.12 0.1
+Ks 0.6 0.6 0.6
+Ns 64
+
+newmtl Glass
+Kd 0.1 0.16 0.24
+Ks 0.9 0.9 0.9
+Ns 128
+
+newmtl Tire
+Kd 0.07 0.07 0.07
+Ks 0.05 0.05 0.05
+Ns 8
+
+newmtl Headlight
+Kd 1.0 0.95 0.7
+Ks 0.3 0.3 0.3
+Ns 32
+
+newmtl Taillight
+Kd 0.75 0.0 0.05
+Ks 0.3 0.3 0.3
+Ns 32
