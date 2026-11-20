@@ -20,7 +20,7 @@ Local -> World -> View -> NDC (Normalized Device Coordinates)
 ## Assignment 6
 - [X] SceneNode: Transform should now become a composite of separate TRS
 - [ ] Test Ray->Plane
-- [ ] Implement ray collisions for sphere and triangle
+- [X] Implement ray collisions for sphere and triangle
 - [ ] GUI setup, don't hook up yet
 - [ ] Light implementation w/ new TRS composition
 - [ ] Material setup for next step

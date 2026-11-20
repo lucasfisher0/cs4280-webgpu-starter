@@ -23,69 +23,55 @@ async function init() {
     const camera = new Camera({name: "Camera", canvasId: "gpu-canvas"}).addToNode(scene);
     camera.clipFar = 500;
 
-    //#region UNIFORM
-    const UNIFORM_SIZE: number = 84 * 4;
-    device.pushErrorScope('validation');
-    let uniformBuffer: GPUBuffer = device.createBuffer({
-      label: "uniform",
-      size: UNIFORM_SIZE,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-    device.popErrorScope().then(e => e && console.error('uniform buffer error:', e.message));
-    //endregion
-
-    //#region SHADERS
-    device.pushErrorScope('validation');
-    const shaderModule = createShaderModule(device, shaderCode, "shaders");
-    device.popErrorScope().then(e => e && console.error('Shader Module error:', e.message));
-    //endregion
-
-    //#region BIND GROUPS
-    device.pushErrorScope('validation');
     const bindGroupLayout = device.createBindGroupLayout({
-      label: "uniform-layout",
-      entries: [{
-        binding: 0,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: {type: 'uniform'}
-      }]
-    });
-    device.popErrorScope().then(e => e && console.error('Bind Group Layout error:', e.message));
-    device.pushErrorScope('validation');
-    const bindGroup = device.createBindGroup({
-      label: "uniform-group",
-      layout: bindGroupLayout,
+      label: "triangle-textured",
       entries: [
-        {binding: 0, resource: {buffer: uniformBuffer}}
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} }
       ]
     });
-    device.popErrorScope().then(e => e && console.error('Bind Group error:', e.message));
-    //endregion
-
-    const FLOATS_PER_VERTEX = 6;
+    const shaderModule = device.createShaderModule({ code: shaderCode });
     const pipeline = device.createRenderPipeline({
       label: "pipeline",
       layout: device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]}),
       vertex: {
         module: shaderModule,
-        entryPoint: 'vertexMain',
-        buffers: [{
-          arrayStride: FLOATS_PER_VERTEX * 4,
-          attributes: [
-            {shaderLocation: 0, offset: 0, format: 'float32x3'},  // position
-            {shaderLocation: 1, offset: 12, format: 'float32x3'}, // normal
-          ]
-        }]
+        entryPoint: 'vertexMain'
       },
       fragment: {
         module: shaderModule,
         entryPoint: 'fragmentMain',
         targets: [{format}]
       },
-      primitive: {topology: 'triangle-list', cullMode: 'back'},
-      depthStencil: {format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less'}
+      primitive: {topology: 'triangle-list'},
+      depthStencil: { format: "depth24plus", depthWriteEnabled: false, depthCompare: "always" }
     });
 
+    let pixels;
+    let texture;
+    let sampler;
+    let bindGroup;
+    let cursor = 0;
+    let aspect = 0;
+    const restart = () => {
+      pixels = new Uint8Array(canvas.width * canvas.height * 4); // RGBA, row 0 at the top
+      texture = device.createTexture({size: [canvas.width, canvas.height], format: "rgba8unorm", usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING });
+      sampler = device.createSampler({magFilter: "nearest", minFilter: "nearest"});
+
+      bindGroup = device.createBindGroup({
+        label: "uniform-group",
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: sampler },
+          { binding: 1, resource: texture.createView() }
+        ]
+      });
+
+      cursor = 0;
+      aspect = canvas.width / canvas.height;
+    }
+
+    restart();
     animate(
       canvas,
       device,
@@ -93,6 +79,55 @@ async function init() {
       "fps-label",
       null,
       (renderPass: GPURenderPassEncoder, dt: number, aspect: number, time: number) => {
+        if (cursor < (canvas.width * canvas.height))
+          return;
+
+        const tracePixel = (x: number, y: number) => {}
+
+        let x = cursor % canvas.width;
+        let y = (cursor - x) / canvas.width;
+        while (dt < 0.1) {
+          if (x >= canvas.width) {
+            x = 0;
+            y++;
+          }
+          tracePixel(x, y);
+          cursor++;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        }
+
+
+
+
+
+
+        renderPass.draw(3);
+
+
+
+
+
+
+
 
       });
   } catch (error) {

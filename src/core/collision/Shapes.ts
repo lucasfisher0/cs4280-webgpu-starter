@@ -64,7 +64,7 @@ const TOLERANCE = 1e-4;
 
 export interface Shape {
   getBounds(): Box;
-  hit(ray: Ray, t0: number, t1: number): HitRecord | null;
+  hit(ray: Ray, t0: number, t1: number): HitRecord | Array<HitRecord> | null;
 }
 
 class Box implements Shape {
@@ -273,8 +273,34 @@ class Sphere implements Shape {
     return this.#bounds;
   }
   /** Tests collision between shape and ray. */
-  hit(ray: Ray, t0: number, t1: number): HitRecord | null {
-    return null;
+  hit(ray: Ray, t0: number, t1: number): HitRecord[] | null {
+    const l = Vec3.sub(this.#origin, ray.origin);
+    const tc = Vec3.dot(l, ray.direction);
+    if (tc < 0)
+      return null;
+
+    const d = Math.sqrt((tc**2) - (l.length()**2));
+    if (d > this.#radius)
+      return null;
+
+    const t1c = Math.sqrt((this.#radius**2) - (d**2));
+    const result: HitRecord[] = [];
+
+    const tnear = tc - t1c;
+    if (tnear >= t0 && tnear <= t1) {
+      const position = ray.evaluate(tnear);
+      const normal = Vec3.sub(this.#origin, position).negate().normalize();
+      result.push(new HitRecord(this, tnear, position, normal))
+    }
+
+    const tfar = tc + t1c;
+    if (tfar >= t0 && tfar <= t1) {
+      const position = ray.evaluate(tfar);
+      const normal = Vec3.sub(this.#origin, position).negate().normalize();
+      result.push(new HitRecord(this, tfar, position, normal))
+    }
+
+    return result.length > 0 ? result : null;
   }
 
   constructor(origin: Vec3, radius: number) {
