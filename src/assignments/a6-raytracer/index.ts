@@ -187,7 +187,7 @@ async function init() {
       const sceneObjects = state.useCarBounds ? [...scene, carBounds] : [...scene, ...carTriangles];
       for (const surf of sceneObjects) {
         state.raysTraced++;
-        if (surf instanceof Triangle) state.triangleTests++;
+        if (surf instanceof Shapes.Triangle) state.triangleTests++;
         const rec = surf.hit(ray, t0, t1);
         if (rec)
         {
