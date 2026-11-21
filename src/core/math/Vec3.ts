@@ -63,26 +63,24 @@ export class Vec3 {
 
   scale(s: number): Vec3 {
     let jsVec = JSVec3.scale(this.toArray(), s) as [number, number, number];
-    this.x = jsVec[0];
-    this.y = jsVec[1];
-    this.z = jsVec[2];
+    return new Vec3(jsVec[0], jsVec[1], jsVec[2]);
+  }
+
+  clamp(min: number, max: number) {
+    this.x = Math.max(Math.min(max, this.x), min);
+    this.y = Math.max(Math.min(max, this.y), min);
+    this.z = Math.max(Math.min(max, this.z), min);
     return this;
   }
 
   normalize() {
-    let xyz = JSVec3.normalize(this.toArray());
-    this.x = xyz[0] ?? this.x;
-    this.y = xyz[1] ?? this.y;
-    this.z = xyz[2] ?? this.z;
-    return this;
+    let jsVec = JSVec3.normalize(this.toArray());
+    return new Vec3(jsVec[0]!, jsVec[1], jsVec[2]);
   }
 
   negate() {
-    let xyz = JSVec3.negate(this.toArray());
-    this.x = xyz[0] ?? this.x;
-    this.y = xyz[1] ?? this.y;
-    this.z = xyz[2] ?? this.z;
-    return this;
+    let jsVec = JSVec3.negate(this.toArray());
+    return new Vec3(jsVec[0]!, jsVec[1], jsVec[2]);
   }
 
   /* Static Operations */

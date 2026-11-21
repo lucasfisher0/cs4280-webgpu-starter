@@ -65,9 +65,9 @@ const TOLERANCE = 1e-4;
 export abstract class Shape {
   abstract getBounds(): Box;
   abstract hit(ray: Ray, t0: number, t1: number): HitRecord | Array<HitRecord> | null;
-  ka: Vec3 = new Vec3(0.05, 0.05, 0.05);  // Ambient
-  kd: Vec3 = new Vec3(0.05, 0.05, 0.05);  // Diffuse
-  ks: Vec3 = new Vec3(0.05, 0.05, 0.05);  // Specular
+  ka: (this: Shape, x: Vec3, n: Vec3) => Vec3 = (x, n) => { return this.kd(x, n).scale(0.5); };  // Ambient
+  kd: (this: Shape, x: Vec3, n: Vec3) => Vec3 = (x, n) => { return new Vec3(0.05, 0.05, 0.05); };  // Diffuse
+  ks: (this: Shape, x: Vec3, n: Vec3) => Vec3 = (x, n) => { return this.kd(x, n).scale(1.2).clamp(0, 1); };  // Specular
   ns: number = 8;                                   // Shininess
   rho: number = 0;                                  // Reflectivity
 }
@@ -91,55 +91,36 @@ export class Box extends Shape {
   getBounds(): Box {
     return this;
   }
-  /** Tests collision between shape and ray. */
-  hit(ray: Ray, t0: number, t1: number) {
-    let min = new Vec3(-Infinity);
-    let max = new Vec3(Infinity);
-    // Check if ray is inside box
-    let insideBox = true;
-    for (const axis of AXES) {
-      const o = axis.get(ray.origin);
-      if (o < axis.get(this.min) || o > axis.get(this.max)) {
-        insideBox = false;
-        break;
-      }
-    }
+  /** Tests collision between Box and ray. */
+  hit(ray: Ray, t0: number, t1: number): HitRecord | null {
+    let tnear = -Infinity;
+    let tfar = Infinity;
 
     // Slab-method check
     for (const axis of AXES) {
-      const a = 1 / axis.get(ray.direction);
-
-      // If direction is perpendicular on this axis, check if origin lies outside the box
-      if (Math.abs(axis.get(ray.direction)) < TOLERANCE) {
-        const o = axis.get(ray.origin);
-        if (!insideBox || o < axis.get(this.min) || o > axis.get(this.max))
-          return null; // If a single axis misses, there is no overlap.
+      const pmin = axis.get(this.min);
+      const pmax = axis.get(this.max);
+      const o = axis.get(ray.origin);
+      const d = axis.get(ray.direction);
+      const a = 1 / d;
+      if (Math.abs(d) < TOLERANCE) {
+        if (o < pmin || o > pmax) return null;
       }
 
-      if (a >= 0) {
-        axis.set(min, a * (axis.get(this.min) - axis.get(ray.origin)));
-        axis.set(max, a * (axis.get(this.max) - axis.get(ray.origin)));
-      }
-      else {
-        axis.set(max, a * (axis.get(this.min) - axis.get(ray.origin)));
-        axis.set(min, a * (axis.get(this.max) - axis.get(ray.origin)));
-      }
+      let tmin = a * (pmin - o);
+      let tmax = a * (pmax - o);
+      if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+
+      if (tmin > tnear) tnear = tmin;
+      if (tmax < tfar)  tfar  = tmax;
     }
+    if (tnear > tfar) return null;
 
-    const tnear = Math.max(min.x, min.y, min.z);
-    const tfar = Math.min(max.x, max.y, max.z);
-
-    const thit = insideBox ? tfar : tnear;
-    const tother = insideBox ? tnear : tfar;
-    if (thit < tother)
-      return null; // No overlap
-    if (tother < t0 || thit > t1)
-      return null; // outside [t0, t1]
-    if (thit < TOLERANCE)
-      return null;
+    const t = tnear > t0 ? tnear : tfar;
+    if (!(t > t0 && t <= t1)) return null; // also rejects NaN
 
     // Compute hit normals
-    const position = ray.evaluate(thit);
+    const position = ray.evaluate(t);
     let c = Vec3.Zero();
     let h = Vec3.Zero();
     for (const axis of AXES) {
@@ -162,10 +143,7 @@ export class Box extends Shape {
       }
     }
 
-    if (insideBox)
-      normal = normal.negate();
-
-    return new HitRecord(this, tnear, position, normal);
+    return new HitRecord(this, t, position, normal);
   }
 
   constructor(box: BoundingBox) {
@@ -235,15 +213,14 @@ export class Triangle extends Shape {
     const gamma = (i*(a*k-j*b) + h*(j*c-a*l) + g*(b*l-k*c))/M
     if (gamma < 0 || gamma > 1)
       return null;
-
     // Compute β (a->b)
-    const beta = (j*(e*i-h*f) + k*(g*f)-d*i) + l*(d*h-e*g)/M
+    const beta = (j*(e*i-h*f) + k*(g*f-d*i) + l*(d*h-e*g))/M
     if (beta < 0 || beta > (1 - gamma))
       return null;
 
     const position = ray.evaluate(t);
     const normal = Vec3.triangleNormal(this.#points[0], this.#points[1], this.#points[2]);
-    return new HitRecord(this, t, position, normal);
+    return new HitRecord(this as Shape, t, position, normal);
   }
 
   constructor(points: TrianglePoints) {
@@ -283,14 +260,13 @@ export class Sphere extends Shape {
   hit(ray: Ray, t0: number, t1: number): HitRecord[] | null {
     const l = Vec3.sub(this.#origin, ray.origin);
     const tc = Vec3.dot(l, ray.direction);
-    if (tc < 0)
+
+    const d2 = l.length() ** 2 - tc ** 2;
+    const r2 = this.#radius ** 2;
+    if (d2 > r2)
       return null;
 
-    const d = Math.sqrt((tc**2) - (l.length()**2));
-    if (d > this.#radius)
-      return null;
-
-    const t1c = Math.sqrt((this.#radius**2) - (d**2));
+    const t1c = Math.sqrt(r2 - d2);
     const result: HitRecord[] = [];
 
     const tnear = tc - t1c;
