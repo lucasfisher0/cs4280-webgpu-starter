@@ -2,9 +2,9 @@ import {Vec2} from "@/core/math/Vec2.ts";
 import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
-import * as Transform from "@/core/math/Transform.ts";
+import * as Transforms from "@/core/math/Transforms.ts";
 import {Mesh} from "@/core/render/Mesh.ts";
-import {createBuffer} from "@/lib/webgpu/buffers";
+import {createBuffer} from "@/lib/webgpu";
 import {IndexedMesh} from "@/core/render/IndexedMesh.ts";
 
 
@@ -51,6 +51,7 @@ enum OBJ_TOKEN {
 }
 
 enum MTL_TOKEN {
+  MATERIAL = "newmtl",
   AMBIENT = "Ka",
   DIFFUSE = "Kd",
   SPECULAR = "Ks",
@@ -103,7 +104,7 @@ export function parseOBJ(text: string, computeNormals: boolean = true) {
   const resolve = (index: number, count: number): number => (index < 0 ? count + index : index - 1);
 
   for (const line of text.split(/\r?\n/)) {
-    const [tag, ...values] = line.trim().split(/\s+/).map(str => str.toLowerCase());
+    const [tag, ...values] = line.trim().split(/\s+/);
     if (!tag || isToken(tag, OBJ_TOKEN.COMMENT))
       continue;
     if (isToken(tag, OBJ_TOKEN.SET_OBJECT))
@@ -156,7 +157,7 @@ export function parseMTL(text: string) {
   let current: WavefrontMaterial | null = null;
   for (const line of text.split(/\r?\n/)) {
     const [tag, ...values] = line.trim().split(/\s+/);
-    if (isToken(tag, OBJ_TOKEN.MATERIAL)) {
+    if (isToken(tag, MTL_TOKEN.MATERIAL)) {
       const { Ka, Kd, Ks } = DEFAULT_MATERIAL;
       current = { ...DEFAULT_MATERIAL, Ka: Ka, Kd: Kd, Ks: Ks };
       materials[values.join(" ")] = current;

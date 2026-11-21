@@ -12,8 +12,25 @@
 - [ ] Code quality (RUN LINTER BEFORE SUBMISSION!)
 - [ ] Post-submission questions
 
-
 Local -> World -> View -> NDC (Normalized Device Coordinates)
 
-
 * WebGPU is left-handed. NDC map Z from 0.0 near to 1.0 far
+
+
+## Assignment 6
+- [X] SceneNode: Transform should now become a composite of separate TRS
+- [ ] Test Ray->Plane
+- [X] Implement ray collisions for sphere and triangle
+- [ ] GUI setup, don't hook up yet
+- [ ] Light implementation w/ new TRS composition
+- [ ] Material setup for next step
+- [ ] Create the room boxes
+- [ ] Setup the shaders for the project (simple since everything is done on CPU, rendered onto a single triangle)
+- [ ] Finalize camera/ray generation
+- [ ] Test simple render with just the room boxes
+- [ ] Import the car model
+- [ ] Shading
+- [ ] Shadows
+- [ ] Reflections
+- [ ] Complete GUI connections
+

@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebGPU PBR Teapot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-zinc-800 min-h-screen flex flex-col items-center p-6 font-sans">
+  <header class="text-center mb-4">
+    <h1 class="text-2xl font-bold text-white">WebGPU PBR Teapot</h1>
+    <p class="text-xs text-zinc-400 mt-1">GGX microfacet BRDF (Schlick Fresnel) plus a Lambertian diffuse lobe,
+      and one point light<br>Environment light by Monte Carlo (cosine and cos<sup>n</sup> hemisphere sampling),
+      averaged over frames</p>
+  </header>
+
+  <main class="w-full max-w-2xl border border-zinc-800 rounded-xl overflow-hidden shadow-2xl relative">
+    <div class="relative aspect-[16/10] bg-black">
+      <canvas id="gpu-canvas" class="w-full h-full touch-none cursor-grab active:cursor-grabbing block"></canvas>
+    </div>
+
+    <div class="flex justify-between items-center px-4 py-2 border-t border-zinc-800 text-xs text-zinc-500">
+      <span>Drag on canvas to orbit view</span>
+      <span id="spp-label"></span>
+      <span id="fps-label">FPS: --</span>
+    </div>
+  </main>
+
+  <script type="module">
+    import GUI from "lil-gui";
+    // ?url: Vite copies the file into the build and hands us its URL.
+    import teapotURL from "@/assets/obj/teapot.obj?url";
+    import * as mat4 from "@/lib/math/mat4.js";
+    import { parseOBJ } from "@/lib/obj-mtl.js";
+    import { animate, initializeWebGPU, Mesh, OrbitController } from "@/lib/webgpu.js";
+
+    // "Show" lets us look at each piece of the BRDF on its own.
+    // D, F and G are the point light's terms; "Diffuse only" and
+    // "Specular only" apply to both the point light and the environment.
+    const SHOW = { "Final Color": 0, "D (distribution)": 1, "F (Fresnel vs. view angle)": 2, "G (masking-shadowing)": 3,
+                   "Diffuse only": 4, "Specular only": 5 };
+
+    const state = {
+      isSpinning: false,        // a still teapot lets the frames accumulate
+      show: SHOW["Final Color"],
+
+      // Material (metallic/roughness workflow)
+      albedo: [0x00 / 255, 0x61 / 255, 0xff / 255],  // base color #0061ff
+      metallic: 0.0,            // 0 = dielectric (plastic), 1 = metal
+      roughness: 0.4,           // 0 = mirror-smooth, 1 = fully rough
+
+      // Point light
+      lightColor: [1.0, 1.0, 1.0],
+      lightIntensity: 20,       // radiant intensity; falls off with 1/d^2
+      lightX: 2.0,
+      lightY: 2.0,
+      lightZ: 2.5,
+      orbitLight: false,
+
+      // Environment light
+      envIntensity: 1.0,        // 0 turns it off
+      samples: 32,              // Monte Carlo samples per pixel, per frame
+      accumulate: true,         // average the frames while nothing changes
+      maxSamples: 4096,         // stop after this many samples per pixel
+      showBackground: true,
+    };
+
+    const gui = new GUI({ title: "Controls" });
+    gui.add(state, "show", SHOW).name("Show");
+    gui.add(state, "isSpinning").name("Spinning");
+
+    const materialFolder = gui.addFolder("Material");
+    materialFolder.addColor(state, "albedo").name("Albedo");
+    materialFolder.add(state, "metallic", 0, 1, 0.01).name("Metallic");
+    materialFolder.add(state, "roughness", 0.04, 1, 0.01).name("Roughness");
+
+    const lightFolder = gui.addFolder("Point Light");
+    lightFolder.addColor(state, "lightColor").name("Color");
+    lightFolder.add(state, "lightIntensity", 0, 100, 0.5).name("Intensity");
+    lightFolder.add(state, "lightX", -5, 5, 0.1).name("Light X").listen();
+    lightFolder.add(state, "lightY", -5, 5, 0.1).name("Light Y");
+    lightFolder.add(state, "lightZ", -5, 5, 0.1).name("Light Z").listen();
+    lightFolder.add(state, "orbitLight").name("Orbit Light");
+
+    const envFolder = gui.addFolder("Environment");
+    envFolder.add(state, "envIntensity", 0, 3, 0.05).name("Intensity");
+    envFolder.add(state, "samples", 1, 256, 1).name("Samples / frame");
+    envFolder.add(state, "accumulate").name("Accumulate Frames");
+    envFolder.add(state, "maxSamples", 1, 16384, 1).name("Stop after (spp)");
+    envFolder.add(state, "showBackground").name("Show Background");
+
+    //  X Y Z | NX NY NZ  -> 6 floats (24 bytes) per vertex
+    const FLOATS_PER_VERTEX = 6;
+
+    // --- Geometry: the Utah teapot, from an OBJ file -------------------
+    // The normals come from the file (exact ones, computed from the
+    // teapot's Bezier patches). An OBJ corner names a position and a normal
+    // separately, so each distinct (position, normal) pair becomes one vertex.
+    function meshFromOBJ(text, size) {
+      const obj = parseOBJ(text);
+      const vertices = [];
+      const indices = [];
+      const vertexOf = new Map();   // "p/n" -> vertex index
+      // Scale so the farthest point is `size` from the origin.
+      const scale = size / Math.max(...obj.positions.map((p) => Math.hypot(...p)));
+      for (const triangle of obj.triangles) {
+        for (const { p, n } of triangle.corners) {
+          const key = `${p}/${n}`;
+          if (!vertexOf.has(key)) {
+            vertexOf.set(key, vertices.length / FLOATS_PER_VERTEX);
+            vertices.push(...obj.positions[p].map((x) => x * scale), ...obj.normals[n]);
+          }
+          indices.push(vertexOf.get(key));
+        }
+      }
+      return { vertices, indices };
+    }
+
+    // --- Shaders -------------------------------------------------------
+    // Uniform layout (byte offsets); each vec3 is padded to 16 bytes by
+    // the f32 that follows it:
+    //   0  mvp           mat4x4
+    //  64  model         mat4x4
+    // 128  normalMatrix  mat4x4
+    // 192  lightPos vec3,     204 lightIntensity f32
+    // 208  eyePos vec3,       220 metallic f32
+    // 224  albedo vec3,       236 roughness f32
+    // 240  lightColor vec3,   252 envIntensity f32
+    // 256  show u32,          260 samples u32
+    // 264  frame u32,         268 showBackground u32
+    // 272  tanHalf f32,       276 aspect f32
+    // 280  accumCount u32     (+4 bytes padding)
+    // 288  total
+    const UNIFORM_SIZE = 288;
+    const FOV = Math.PI / 6;
+
+    const wgslSource = /* wgsl */ `
+      struct Uniforms {
+        mvp            : mat4x4<f32>,
+        model          : mat4x4<f32>,
+        normalMatrix   : mat4x4<f32>,
+        lightPos       : vec3<f32>,
+        lightIntensity : f32,
+        eyePos         : vec3<f32>,
+        metallic       : f32,
+        albedo         : vec3<f32>,
+        roughness      : f32,
+        lightColor     : vec3<f32>,
+        envIntensity   : f32,
+        show           : u32,
+        samples        : u32,
+        frame          : u32,
+        showBackground : u32,
+        tanHalf        : f32,
+        aspect         : f32,
+        accumCount     : u32,
+      };
+      @group(0) @binding(0) var<uniform> u : Uniforms;
+
+      const PI = 3.14159265;
+
+      // ---- Random numbers (PCG hash, as in the path tracer) -----------
+      fn pcg(v : u32) -> u32 {
+        let state = v * 747796405u + 2891336453u;
+        let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+        return (word >> 22u) ^ word;
+      }
+      fn rand(seed : ptr<function, u32>) -> f32 {
+        *seed = pcg(*seed);
+        return f32(*seed) / 4294967296.0;
+      }
+
+      // ---- The environment: radiance arriving from direction d --------
+      // A procedural "studio": sky above, ground below, and two bright
+      // round softboxes. y is up; the camera looks down -z.
+      fn softbox(d : vec3<f32>, center : vec3<f32>, cosRadius : f32, L : vec3<f32>) -> vec3<f32> {
+        return L * smoothstep(cosRadius - 0.01, cosRadius + 0.01, dot(d, normalize(center)));
+      }
+      fn environment(d : vec3<f32>) -> vec3<f32> {
+        let horizon = vec3<f32>(0.80, 0.78, 0.75);
+        let zenith  = vec3<f32>(0.20, 0.38, 0.80);
+        let ground  = vec3<f32>(0.16, 0.14, 0.12);
+        var c = mix(horizon, zenith, sqrt(max(d.y, 0.0)));
+        c = mix(c, ground, smoothstep(0.0, 0.15, -d.y));
+        c += softbox(d, vec3<f32>(-0.6, 0.7, 0.6), 0.93, vec3<f32>(6.0, 5.8, 5.4));   // key, upper left
+        c += softbox(d, vec3<f32>(0.9, 0.3, -0.5), 0.96, vec3<f32>(3.0, 3.3, 4.0));   // rim, behind right
+        return u.envIntensity * c;
+      }
+
+      // Frames are drawn in three passes:
+      //   1. scene:      background + teapot -> this frame's HDR estimate
+      //   2. accumulate: running mean of all estimates since the last change
+      //   3. display:    tone-map the mean onto the canvas
+      // Averaging k frames of n samples is one estimate with k*n samples,
+      // so the noise falls as 1/sqrt(k*n) (Module 11).
+
+      // ---- Teapot -----------------------------------------------------
+      struct VertexOutput {
+        @builtin(position) position : vec4<f32>,
+        @location(0) worldPos    : vec3<f32>,
+        @location(1) worldNormal : vec3<f32>,
+      };
+
+      @vertex
+      fn vs_main(@location(0) position : vec3<f32>,
+                 @location(1) normal   : vec3<f32>) -> VertexOutput {
+        var out : VertexOutput;
+        out.position    = u.mvp * vec4<f32>(position, 1.0);
+        out.worldPos    = (u.model * vec4<f32>(position, 1.0)).xyz;
+        out.worldNormal = (u.normalMatrix * vec4<f32>(normal, 0.0)).xyz;
+        return out;
+      }
+
+      // ---- The microfacet glossy lobe (Module 12) ----------------------
+      //   ρ_glossy = D G F / (4 (N.L)(N.V))
+
+      // D: the GGX distribution.
+      // How many microfacets face the half vector H?
+      fn distributionGGX(NdotH : f32, roughness : f32) -> f32 {
+        let a  = roughness * roughness;   // artist's roughness: alpha = rough^2
+        let a2 = a * a;
+        let d  = NdotH * NdotH * (a2 - 1.0) + 1.0;
+        return a2 / (PI * d * d);
+      }
+
+      // G: masking-shadowing (Schlick-GGX approximation).
+      // The fraction of those facets not shadowed (toward L) or hidden
+      // (toward V) by their neighbors.
+      fn geometrySchlickGGX(NdotX : f32, k : f32) -> f32 {
+        return NdotX / (NdotX * (1.0 - k) + k);
+      }
+      fn maskingShadowing(NdotV : f32, NdotL : f32, roughness : f32) -> f32 {
+        let r = roughness + 1.0;
+        let k = (r * r) / 8.0;            // k for direct (analytic) lights
+        return geometrySchlickGGX(NdotV, k) * geometrySchlickGGX(NdotL, k);
+      }
+      fn maskingShadowingIBL(NdotV : f32, NdotL : f32, roughness : f32) -> f32 {
+        let k = roughness * roughness / 2.0;   // k for environment light
+        return geometrySchlickGGX(NdotV, k) * geometrySchlickGGX(NdotL, k);
+      }
+
+      // F: Fresnel reflectance (Schlick). It rises toward 1 at grazing angles.
+      // F0 = reflectance looking straight on.
+      fn fresnelSchlick(cosTheta : f32, F0 : vec3<f32>) -> vec3<f32> {
+        return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+      }
+
+      // ---- Sampling the hemisphere (Module 11) ------------------------
+
+      // Basis (t, b, nrm) around nrm, so a direction sampled around +z can
+      // be turned to point around nrm.
+      fn toWorld(v : vec3<f32>, nrm : vec3<f32>) -> vec3<f32> {
+        // select(falseValue, trueValue, condition): pick a helper axis not parallel to nrm
+        let a = select(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), abs(nrm.x) > 0.9);
+        let t = normalize(cross(a, nrm));
+        let b = cross(nrm, t);
+        return v.x * t + v.y * b + v.z * nrm;
+      }
+
+      // Exponent 1: pdf = cos(theta) / pi, around the normal (the diffuse lobe).
+      fn sampleCosineHemisphere(xi : vec2<f32>) -> vec3<f32> {
+        let phi = 2.0 * PI * xi.x;
+        let s = sqrt(xi.y);
+        return vec3<f32>(cos(phi) * s, sin(phi) * s, sqrt(1.0 - xi.y));
+      }
+
+      // Exponent n: pdf = (n+1)/(2 pi) cos^n(theta), around the mirror
+      // direction (the glossy lobe). A bigger n gives a narrower lobe.
+      fn sampleCosPowerHemisphere(xi : vec2<f32>, n : f32) -> vec3<f32> {
+        let phi = 2.0 * PI * xi.x;
+        let c = pow(1.0 - xi.y, 1.0 / (n + 1.0));
+        let s = sqrt(max(1.0 - c * c, 0.0));
+        return vec3<f32>(cos(phi) * s, sin(phi) * s, c);
+      }
+      fn pdfCosPower(cosTheta : f32, n : f32) -> f32 {
+        if (cosTheta <= 0.0) { return 0.0; }   // also avoids pow(0, 0) when n = 0
+        return (n + 1.0) / (2.0 * PI) * pow(cosTheta, n);
+      }
+
+      // ---- The BRDF (Module 12), split into its two lobes -------------
+      // Same as the point light's, but with k = alpha/2 in G, the value
+      // for image-based light.
+      struct Lobes { diffuse : vec3<f32>, specular : vec3<f32> };
+
+      fn brdf(N : vec3<f32>, V : vec3<f32>, L : vec3<f32>, NdotV : f32,
+              albedo : vec3<f32>, F0 : vec3<f32>) -> Lobes {
+        let H = normalize(V + L);
+        let NdotL = max(dot(N, L), 1e-4);
+        let D = distributionGGX(max(dot(N, H), 0.0), u.roughness);
+        let G = maskingShadowingIBL(NdotV, NdotL, u.roughness);
+        let F = fresnelSchlick(max(dot(V, H), 0.0), F0);
+        let kD = (vec3<f32>(1.0) - F) * (1.0 - u.metallic);
+        return Lobes(kD * albedo / PI, D * G * F / (4.0 * NdotV * NdotL));
+      }
+
+      // ---- Environment light: Monte Carlo over the hemisphere ---------
+      //   Lo = ∫ ρ(L, V) Lenv(L) (N.L) dL  ≈  (1/N) Σ ρ Lenv (N.L) / p(L)
+      // The diffuse lobe is wide and the glossy lobe hugs the mirror
+      // direction R, so each sample flips a coin: half the time a cosine
+      // direction around N, half the time a cos^n direction around R.
+      // That is sampling from the average of the two densities,
+      //   p(L) = ½ (N.L)/pi + ½ (n+1)/(2 pi) (R.L)^n,
+      // which is never 0 where ρ isn't, so the average is still correct.
+      // Directions below the surface add 0 (Module 11: discard them).
+      fn envLight(N : vec3<f32>, V : vec3<f32>, NdotV : f32, albedo : vec3<f32>, F0 : vec3<f32>,
+                  seed : ptr<function, u32>) -> Lobes {
+        let R = reflect(-V, N);
+        // Pick n so the cos^n lobe is about as wide as the GGX lobe. Any n
+        // gives the right answer on average; a closer match is less noisy.
+        let a = u.roughness * u.roughness;
+        let n = max(2.0 / (a * a) - 2.0, 0.0) / 4.0;
+
+        var diff = vec3<f32>(0.0);
+        var spec = vec3<f32>(0.0);
+        for (var i = 0u; i < u.samples; i++) {
+          let xi = vec2<f32>(rand(seed), rand(seed));
+          var L : vec3<f32>;
+          if (rand(seed) < 0.5) {
+            L = toWorld(sampleCosineHemisphere(xi), N);
+          } else {
+            L = toWorld(sampleCosPowerHemisphere(xi, n), R);
+          }
+          let NdotL = dot(N, L);
+          if (NdotL <= 0.0) { continue; }
+          let p = 0.5 * NdotL / PI + 0.5 * pdfCosPower(dot(R, L), n);
+          let w = environment(L) * NdotL / p;
+          let f = brdf(N, V, L, NdotV, albedo, F0);
+          diff += f.diffuse * w;
+          spec += f.specular * w;
+        }
+        let count = f32(u.samples);
+        return Lobes(diff / count, spec / count);
+      }
+
+      @fragment
+      fn fs_main(in : VertexOutput,
+                 @builtin(front_facing) front : bool) -> @location(0) vec4<f32> {
+        // Back faces (seen through the teapot's spout or lid gap) get the
+        // flipped normal, so the inside is shaded as a surface too.
+        let N = select(-1.0, 1.0, front) * normalize(in.worldNormal);
+        let V = normalize(u.eyePos - in.worldPos);
+        let toLight = u.lightPos - in.worldPos;
+        let L = normalize(toLight);
+        let H = normalize(V + L);
+
+        let NdotL = max(dot(N, L), 0.0);
+        let NdotV = max(dot(N, V), 1e-4);
+        let NdotH = max(dot(N, H), 0.0);
+        let HdotV = max(dot(H, V), 0.0);
+
+        // Color pickers give sRGB values; lighting math must be linear.
+        let albedo = pow(u.albedo, vec3<f32>(2.2));
+
+        // Dielectrics reflect ~4% head-on (F0 = 0.04, colorless);
+        // metals reflect their own color and have no diffuse.
+        let F0 = mix(vec3<f32>(0.04), albedo, u.metallic);
+
+        // Radiance arriving from a point light: inverse-square falloff.
+        let dist2 = dot(toLight, toLight);
+        let radiance = u.lightColor * u.lightIntensity / dist2;
+
+        // Glossy lobe:  D * G * F / (4 (N.L)(N.V))
+        let D = distributionGGX(NdotH, u.roughness);
+        let G = maskingShadowing(NdotV, NdotL, u.roughness);
+        let F = fresnelSchlick(HdotV, F0);
+        let specular = D * G * F / (4.0 * NdotV * max(NdotL, 1e-4));
+
+        // Energy conservation: what isn't reflected (F) is refracted and
+        // becomes diffuse — except in metals, which absorb it.
+        let kD = (vec3<f32>(1.0) - F) * (1.0 - u.metallic);
+        let diffuse = kD * albedo / PI;   // Lambert BRDF
+
+        switch u.show {
+          case 1u: { return vec4<f32>(vec3<f32>(D * NdotL), 1.0); }
+          // Not the F above: with one light, V.H is about the same everywhere,
+          // so F(V.H) is a flat 0.04 on plastic. F(N.V) shows the climb to 1 at
+          // grazing angles (the Schlick slide), and it is the F that matters
+          // for mirror-like reflections of the environment, where H is near N.
+          case 2u: { return vec4<f32>(fresnelSchlick(NdotV, F0), 1.0); }
+          case 3u: { return vec4<f32>(vec3<f32>(G), 1.0); }
+          default: {}
+        }
+
+        // A different random stream for every pixel and every frame, so the
+        // Monte Carlo noise changes from frame to frame.
+        var seed = pcg(u32(in.position.x) + pcg(u32(in.position.y) + pcg(u.frame)));
+        let env = envLight(N, V, NdotV, albedo, F0, &seed);
+
+        // Point light (one direction, no integral) + environment (integral).
+        var color : vec3<f32>;
+        switch u.show {
+          case 4u: { color = diffuse * radiance * NdotL + env.diffuse; }
+          case 5u: { color = specular * radiance * NdotL + env.specular; }
+          default: { color = (diffuse + specular) * radiance * NdotL + env.diffuse + env.specular; }
+        }
+        return vec4<f32>(color, 1.0);   // HDR; tone mapping comes at display
+      }
+
+      // ---- Background: the environment itself -------------------------
+      // A full-screen triangle; each pixel looks up the direction its camera
+      // ray points in. Drawn first, without depth, so the teapot covers it.
+      struct BgOutput {
+        @builtin(position) position : vec4<f32>,
+        @location(0) ndc : vec2<f32>,
+      };
+
+      @vertex
+      fn vs_background(@builtin(vertex_index) i : u32) -> BgOutput {
+        var pos = array<vec2<f32>, 3>(vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0));
+        return BgOutput(vec4<f32>(pos[i], 0.0, 1.0), pos[i]);
+      }
+
+      @fragment
+      fn fs_background(in : BgOutput) -> @location(0) vec4<f32> {
+        let dark = vec4<f32>(vec3<f32>(0.0014), 1.0);   // 0.05 gray once tone-mapped
+        if (u.show >= 1u && u.show <= 3u) { return vec4<f32>(0.05, 0.05, 0.05, 1.0); }   // shown as is
+        if (u.showBackground == 0u) { return dark; }
+        let d = normalize(vec3<f32>(in.ndc.x * u.tanHalf * u.aspect, in.ndc.y * u.tanHalf, -1.0));
+        return vec4<f32>(environment(d), 1.0);
+      }
+
+      // ---- Accumulate: running mean of the frames ---------------------
+      // mean_k = mean_(k-1) + (estimate_k - mean_(k-1)) / k, the same
+      // update the path tracer uses. accumCount = 0 starts over.
+      @group(0) @binding(1) var current : texture_2d<f32>;   // this frame
+      @group(0) @binding(2) var history : texture_2d<f32>;   // mean so far
+      @group(0) @binding(3) var image   : texture_2d<f32>;   // mean to show
+
+      @fragment
+      fn fs_accumulate(in : BgOutput) -> @location(0) vec4<f32> {
+        let p = vec2<i32>(in.position.xy);
+        let c = textureLoad(current, p, 0);
+        if (u.accumCount == 0u) { return c; }
+        let h = textureLoad(history, p, 0);
+        return h + (c - h) / f32(u.accumCount + 1u);
+      }
+
+      // ---- Display: HDR -> canvas -------------------------------------
+      // Reinhard tone mapping, then gamma correction (the canvas format is
+      // not sRGB, so we encode it ourselves). D, F and G are shown as is.
+      @fragment
+      fn fs_display(in : BgOutput) -> @location(0) vec4<f32> {
+        let c = textureLoad(image, vec2<i32>(in.position.xy), 0).rgb;
+        if (u.show >= 1u && u.show <= 3u) { return vec4<f32>(c, 1.0); }
+        return vec4<f32>(pow(c / (c + vec3<f32>(1.0)), vec3<f32>(1.0 / 2.2)), 1.0);
+      }
+    `;
+
+    // --- CPU-side matrix math (column-major, like WGSL) ----------------
+    function mat4RotationX(theta) {
+      const c = Math.cos(theta), s = Math.sin(theta);
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        1, 0, 0, 0,
+        0, c, s, 0,
+        0, -s, c, 0,
+        0, 0, 0, 1,
+      ]);
+    }
+
+    function mat4RotationY(theta) {
+      const c = Math.cos(theta), s = Math.sin(theta);
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        c, 0, -s, 0,
+        0, 1, 0, 0,
+        s, 0, c, 0,
+        0, 0, 0, 1,
+      ]);
+    }
+
+    function mat4Translation(x, y, z) {
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        x, y, z, 1,
+      ]);
+    }
+
+    function mat4Perspective(fovRad, aspect, near, far) {
+      const f = 1.0 / Math.tan(fovRad * 0.5);
+      // biome-ignore format: visually align the matrix as a 4x4 grid
+      return new Float32Array([
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, far / (near - far), -1,
+        0, 0, (near * far) / (near - far), 0,
+      ]);
+    }
+
+    async function init() {
+      try {
+        const { canvas, device, context, format } = await initializeWebGPU("gpu-canvas");
+
+        const controller = new OrbitController(canvas, { distance: 3.0, rotX: 0.2, rotY: 0.0 });
+        const teapot = meshFromOBJ(await (await fetch(teapotURL)).text(), 0.8);
+        const mesh = new Mesh(device, {
+          vertices: new Float32Array(teapot.vertices),
+          indices: new Uint16Array(teapot.indices),
+        });
+
+        const uniformBuffer = device.createBuffer({
+          size: UNIFORM_SIZE,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        const uniformData = new ArrayBuffer(UNIFORM_SIZE);
+        const f32 = new Float32Array(uniformData);
+        const u32 = new Uint32Array(uniformData);
+
+        const shaderModule = device.createShaderModule({ code: wgslSource });
+        const HDR = "rgba16float";     // one frame's estimate
+        const ACCUM = "rgba32float";   // the running mean needs the extra precision
+
+        const pipeline = device.createRenderPipeline({
+          layout: "auto",
+          vertex: {
+            module: shaderModule,
+            entryPoint: "vs_main",
+            buffers: [{
+              arrayStride: FLOATS_PER_VERTEX * 4,
+              attributes: [
+                { shaderLocation: 0, offset: 0, format: "float32x3" },  // position
+                { shaderLocation: 1, offset: 12, format: "float32x3" }, // normal
+              ],
+            }],
+          },
+          fragment: { module: shaderModule, entryPoint: "fs_main", targets: [{ format: HDR }] },
+          // No culling: the teapot is not closed, so some back faces show.
+          primitive: { topology: "triangle-list", cullMode: "none" },
+          depthStencil: { format: "depth24plus", depthWriteEnabled: true, depthCompare: "less" },
+        });
+
+        const backgroundPipeline = device.createRenderPipeline({
+          layout: "auto",
+          vertex: { module: shaderModule, entryPoint: "vs_background" },
+          fragment: { module: shaderModule, entryPoint: "fs_background", targets: [{ format: HDR }] },
+          primitive: { topology: "triangle-list" },
+          depthStencil: { format: "depth24plus", depthWriteEnabled: false, depthCompare: "always" },
+        });
+
+        // Explicit layouts for the texture passes: rgba32float can only be
+        // read with textureLoad, as "unfilterable-float".
+        const uniformEntry = { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: {} };
+        const textureEntry = (binding) => ({
+          binding, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "unfilterable-float" },
+        });
+        const accumulateLayout = device.createBindGroupLayout({
+          entries: [uniformEntry, textureEntry(1), textureEntry(2)],
+        });
+        const displayLayout = device.createBindGroupLayout({ entries: [uniformEntry, textureEntry(3)] });
+
+        const accumulatePipeline = device.createRenderPipeline({
+          layout: device.createPipelineLayout({ bindGroupLayouts: [accumulateLayout] }),
+          vertex: { module: shaderModule, entryPoint: "vs_background" },
+          fragment: { module: shaderModule, entryPoint: "fs_accumulate", targets: [{ format: ACCUM }] },
+        });
+        const displayPipeline = device.createRenderPipeline({
+          layout: device.createPipelineLayout({ bindGroupLayouts: [displayLayout] }),
+          vertex: { module: shaderModule, entryPoint: "vs_background" },
+          fragment: { module: shaderModule, entryPoint: "fs_display", targets: [{ format }] },
+        });
+
+        // "auto" layouts belong to one pipeline each, so each gets a bind group.
+        const uniforms = { binding: 0, resource: { buffer: uniformBuffer } };
+        const bindGroup = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [uniforms] });
+        const backgroundBindGroup = device.createBindGroup({
+          layout: backgroundPipeline.getBindGroupLayout(0), entries: [uniforms],
+        });
+
+        // Offscreen targets, sized to the canvas. The two accumulation
+        // textures take turns: one holds the old mean, the other gets the new.
+        let targets = null;
+        function makeTargets(width, height) {
+          if (targets) for (const texture of targets.textures) texture.destroy();
+          const make = (fmt, usage) => device.createTexture({ size: [width, height], format: fmt, usage });
+          const RT = GPUTextureUsage.RENDER_ATTACHMENT;
+          const TB = GPUTextureUsage.TEXTURE_BINDING;
+          const current = make(HDR, RT | TB);
+          const depth = make("depth24plus", RT);
+          const accum = [make(ACCUM, RT | TB), make(ACCUM, RT | TB)];
+          const view = (texture) => texture.createView();
+          targets = {
+            width, height,
+            textures: [current, depth, ...accum],
+            current: view(current),
+            depth: view(depth),
+            accum: accum.map(view),
+            // [i]: write accum[i], reading accum[1 - i]; then show accum[i]
+            accumulateGroups: [0, 1].map((i) => device.createBindGroup({
+              layout: accumulateLayout,
+              entries: [uniforms, { binding: 1, resource: view(current) }, { binding: 2, resource: view(accum[1 - i]) }],
+            })),
+            displayGroups: [0, 1].map((i) => device.createBindGroup({
+              layout: displayLayout,
+              entries: [uniforms, { binding: 3, resource: view(accum[i]) }],
+            })),
+          };
+        }
+
+        const sppLabel = document.getElementById("spp-label");
+        let frame = 0;
+        let accumCount = 0;      // frames in the mean so far
+        let lastSettings = "";   // anything that changes the image restarts the mean
+        let shown = 0;           // which accumulation texture holds the latest mean
+        let startTime = performance.now();
+        animate({
+          canvas,
+          device,
+          context,
+          fpsElementId: "fps-label",
+          depth: false,          // the display pass needs none; the scene pass has its own
+          onFrame: ({ renderPass, dt, aspect, time }) => {
+            if (state.isSpinning && !controller.isDragging) {
+              controller.rotY += dt * 0.5;
+            }
+
+            if (state.orbitLight) {
+              const r = Math.hypot(state.lightX, state.lightZ) || 2.0;
+              state.lightX = r * Math.sin(time);
+              state.lightZ = r * Math.cos(time);
+            }
+
+            if (!targets || targets.width !== canvas.width || targets.height !== canvas.height) {
+              makeTargets(canvas.width, canvas.height);
+            }
+            // Raising or lowering the cap doesn't change the image, so it
+            // isn't a setting: a higher cap picks up where the mean left off.
+            const withoutCap = (key, value) => (key === "maxSamples" ? undefined : value);
+            const settings = JSON.stringify([state, controller.rotX, controller.rotY, controller.distance,
+                                             canvas.width, canvas.height], withoutCap);
+            if (settings !== lastSettings || !state.accumulate) {
+              accumCount = 0;
+              startTime = performance.now();
+            }
+            lastSettings = settings;
+
+            // Done: keep showing the finished mean without new samples.
+            if (accumCount > 0 && accumCount * state.samples >= state.maxSamples) {
+              renderPass.setPipeline(displayPipeline);
+              renderPass.setBindGroup(0, targets.displayGroups[shown]);
+              renderPass.draw(3);
+              return;
+            }
+
+            // The camera stays put and the teapot turns, so world space is
+            // also the camera's frame: the environment stays fixed on screen.
+            const model = mat4.multiply(mat4RotationX(controller.rotX), mat4RotationY(controller.rotY));
+            const view = mat4Translation(0, 0, -controller.distance);
+            const projection = mat4Perspective(FOV, aspect, 0.1, 100.0);
+            const mvp = mat4.multiply(mat4.multiply(projection, view), model);
+            const normalMatrix = mat4.transpose(mat4.invert(model));
+
+            f32.set(mvp, 0);
+            f32.set(model, 16);
+            f32.set(normalMatrix, 32);
+            f32.set([state.lightX, state.lightY, state.lightZ, state.lightIntensity], 48);
+            f32.set([0, 0, controller.distance, state.metallic], 52); // eye is at (0,0,d)
+            f32.set([...state.albedo, state.roughness], 56);
+            f32.set([...state.lightColor, state.envIntensity], 60);
+            u32[64] = state.show;
+            u32[65] = state.samples;
+            u32[66] = frame++;
+            u32[67] = state.showBackground ? 1 : 0;
+            f32[68] = Math.tan(FOV / 2);
+            f32[69] = aspect;
+            u32[70] = accumCount;
+
+            device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+            // Passes 1 and 2 go in their own command buffer, submitted now,
+            // so they run before animate() submits the display pass.
+            const encoder = device.createCommandEncoder();
+            const scene = encoder.beginRenderPass({
+              colorAttachments: [{
+                view: targets.current, clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store",
+              }],
+              depthStencilAttachment: {
+                view: targets.depth, depthClearValue: 1.0, depthLoadOp: "clear", depthStoreOp: "store",
+              },
+            });
+            scene.setPipeline(backgroundPipeline);
+            scene.setBindGroup(0, backgroundBindGroup);
+            scene.draw(3);
+            scene.setPipeline(pipeline);
+            scene.setBindGroup(0, bindGroup);
+            mesh.draw(scene);
+            scene.end();
+
+            const i = frame % 2;
+            shown = i;
+            const accumulate = encoder.beginRenderPass({
+              colorAttachments: [{ view: targets.accum[i], loadOp: "clear", storeOp: "store",
+                                   clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
+            });
+            accumulate.setPipeline(accumulatePipeline);
+            accumulate.setBindGroup(0, targets.accumulateGroups[i]);
+            accumulate.draw(3);
+            accumulate.end();
+            device.queue.submit([encoder.finish()]);
+
+            // Pass 3, in animate()'s pass onto the canvas.
+            renderPass.setPipeline(displayPipeline);
+            renderPass.setBindGroup(0, targets.displayGroups[i]);
+            renderPass.draw(3);
+
+            accumCount++;
+            const seconds = ((performance.now() - startTime) / 1000).toFixed(1);
+            if (sppLabel) sppLabel.textContent = `${accumCount * state.samples} samples per pixel · ${seconds} s`;
+          },
+        });
+      } catch (err) {
+        console.error("WebGPU Initialization Error:", err);
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+
+</html>

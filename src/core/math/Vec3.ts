@@ -16,8 +16,16 @@ export class Vec3 {
     return Vec3.fromArray(JSVec3.clone(this.toArray()));
   }
 
+  toString(): string {
+    return `Vec3(${this.x}, ${this.y}, ${this.z})`;
+  }
+
   static Zero(): Vec3 {
-    return new Vec3(0, 0, 0);
+    return new Vec3(0);
+  }
+
+  static One(): Vec3 {
+    return new Vec3(1);
   }
 
   // Converts a flat array of numbers to Vec3
@@ -53,20 +61,26 @@ export class Vec3 {
     return JSVec3.length(this.toArray());
   }
 
-  normalize() {
-    let xyz = JSVec3.normalize(this.toArray());
-    this.x = xyz[0] ?? this.x;
-    this.y = xyz[1] ?? this.y;
-    this.z = xyz[2] ?? this.z;
+  scale(s: number): Vec3 {
+    let jsVec = JSVec3.scale(this.toArray(), s) as [number, number, number];
+    return new Vec3(jsVec[0], jsVec[1], jsVec[2]);
+  }
+
+  clamp(min: number, max: number) {
+    this.x = Math.max(Math.min(max, this.x), min);
+    this.y = Math.max(Math.min(max, this.y), min);
+    this.z = Math.max(Math.min(max, this.z), min);
     return this;
   }
 
+  normalize() {
+    let jsVec = JSVec3.normalize(this.toArray());
+    return new Vec3(jsVec[0]!, jsVec[1], jsVec[2]);
+  }
+
   negate() {
-    let xyz = JSVec3.negate(this.toArray());
-    this.x = xyz[0] ?? this.x;
-    this.y = xyz[1] ?? this.y;
-    this.z = xyz[2] ?? this.z;
-    return this;
+    let jsVec = JSVec3.negate(this.toArray());
+    return new Vec3(jsVec[0]!, jsVec[1], jsVec[2]);
   }
 
   /* Static Operations */
@@ -88,6 +102,17 @@ export class Vec3 {
 
   static cross(a: Vec3, b: Vec3): Vec3 {
     return Vec3.fromArray(JSVec3.cross(a.toArray(), b.toArray()));
+  }
+
+  /** Returns the "average" or center point for a list of Vec3. */
+  static average(arr: Vec3[]): Vec3 {
+    let c = Vec3.Zero();
+    arr.forEach((v: Vec3) => {v = Vec3.add(c, v)});
+
+    c.x = c.x / arr.length;
+    c.y = c.y / arr.length;
+    c.z = c.z / arr.length;
+    return c;
   }
 
   static lerp(a: Vec3, b: Vec3, t: number): Vec3 {

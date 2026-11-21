@@ -19,11 +19,13 @@ const pages = [
   "assignments/a3-sierpinski-gasket/index.html",
   "assignments/a4-instancing-textures/index.html",
   "assignments/a5-curves-splines/index.html",
+  "assignments/a6-raytracer/index.html",
   "assignments/template/index.html",
   "activities/sample-triangle/index.html",
   "activities/pyramid-mvp/index.html",
   "activities/pyramid-shaded/index.html",
   "activities/sphere-shaded/index.html",
+  "activities/teapot/index.html",
   "activities/snowmen/index.html",
   "activities/snowmen-shader-pattern/index.html",
   "activities/snowmen-canvas-texture/index.html",
@@ -31,6 +33,12 @@ const pages = [
   "activities/sierpinski/index.html",
   "activities/splines/index.html",
   "activities/rtracer/index.html",
+  "activities/pathtracer/index.html",
+  "activities/pathtracer/step1.html",
+  "activities/pathtracer/step2.html",
+  "activities/pathtracer/step3.html",
+  "activities/pathtracer/step4.html",
+  "activities/pathtracer/step5.html",
 ];
 
 // https://vite.dev/config/

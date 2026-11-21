@@ -2,10 +2,9 @@ import {Vec2} from "@/core/math/Vec2.ts";
 import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
-import * as Transform from "@/core/math/Transform.ts";
-import {createBuffer} from "@/lib/webgpu/buffers";
+import * as Transforms from "@/core/math/Transforms.ts";
 import {EDrawLayer, type IDrawable} from "@/core/render/IDrawable.ts";
-import type {BoundingBox} from "@/core/raytracing/BVH.ts";
+import type {BoundingBox} from "@/core/collision/Shapes";
 
 export class Mesh implements Disposable, IDrawable {
   #isDisposed = false;

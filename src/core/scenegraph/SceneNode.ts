@@ -2,7 +2,8 @@ import {Vec2} from "@/core/math/Vec2.ts";
 import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
-import * as Transform from "@/core/math/Transform.ts"
+import * as Transforms from "@/core/math/Transforms.ts"
+import {Transform} from "@/core/scenegraph/Transform.ts"
 import {Mesh} from "@/core/render/Mesh.ts"
 
 let nodeCount: number = 0;
@@ -20,7 +21,9 @@ let nodeCount: number = 0;
 
 interface SceneNodeDescriptor {
   name?: string | null;
-  localTransform?: Mat4 | null;
+  translation?: Vec3;
+  rotation?: Vec3;
+  scale?: Vec3;
 }
 export type {SceneNodeDescriptor};
 
@@ -32,16 +35,13 @@ type TraverseFunction = (node: SceneNode, parent: SceneNode | null) => void;
 export class SceneNode {
   readonly guid: string = crypto.randomUUID();
   name: string;
-  _localTransform: Mat4;
-  _worldTransform: Mat4;
-  #transformDirty: boolean = true;
+  transform: Transform;
   children: SceneNode[] = [];
   parent: SceneNode | null = null;
 
   constructor(desc: SceneNodeDescriptor) {
     this.name = desc.name ?? `node_${nodeCount++}`;
-    this._localTransform = desc.localTransform ?? Mat4.Identity();
-    this._worldTransform = this._localTransform;
+    this.transform = new Transform(desc.translation, desc.rotation, desc.scale);
   }
 
   /** Adds child to this node. **/
@@ -79,42 +79,14 @@ export class SceneNode {
     return null;
   }
 
-  // Transforms
-  public get transform(): Mat4 { return this._localTransform; };
-  public set transform(transform: Mat4) { this._localTransform = transform; this.#transformDirty = true; }
-
-  /**
-   * Sets local transform on this scene node as a composite of Translation, Rotation, and Scale matrices.
-   * @param translation
-   * @param rotation
-   * @param scale
-   */
-  public setTransform(translation?: Mat4, rotation?: Mat4, scale?: Mat4) {
-    this.transform = Mat4.multiplyAll([translation ?? Mat4.Identity(), rotation ?? Mat4.Identity(), scale ?? Mat4.Identity()]);
-  }
-
-  public get worldTransform(): Mat4 { return this._worldTransform ?? this._localTransform; };
-  public set worldTransform(transform: Mat4) {
-    if (this.parent)
-      transform = transform.multiply(this.parent.worldTransform.invert());
-    this._localTransform = transform;
-    this.#transformDirty = true;
-  };
-
   /**
    * Calculates world position using the given parent transform.
    * @param [parentWorldTransform]
    */
   updateWorldTransform(parentWorldTransform: Mat4 = Mat4.Identity()) {
-    this._worldTransform = Mat4.multiply(this._localTransform, parentWorldTransform);
-
-    if (!this.#transformDirty)
-      return;
-
+    this.transform.parent = parentWorldTransform;
     for (const child of this.children)
-      child.updateWorldTransform(this._worldTransform);
-
-    this.#transformDirty = false;
+      child.updateWorldTransform(this.transform.worldTransform);
   }
 
   /**
