@@ -16,6 +16,10 @@ export class Vec3 {
     return Vec3.fromArray(JSVec3.clone(this.toArray()));
   }
 
+  toString(): string {
+    return `Vec3(${this.x}, ${this.y}, ${this.z})`;
+  }
+
   static Zero(): Vec3 {
     return new Vec3(0);
   }

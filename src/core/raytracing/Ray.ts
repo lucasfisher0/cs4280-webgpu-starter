@@ -26,14 +26,14 @@ export class Ray {
 export class HitRecord {
   shape: Shape | null;
   t: number;
-  position: Vec3 | null;
-  normal: Vec3 | null;
+  position: Vec3;
+  normal: Vec3;
 
   constructor(s: Shape | null, t: number | null, position: Vec3 | null, normal: Vec3 | null) {
     this.shape = s;
     this.t = t ?? Infinity;
-    this.position = position;
-    this.normal = normal;
+    this.position = position ?? Vec3.Zero();
+    this.normal = normal ?? Vec3.Zero();
   }
 }
 

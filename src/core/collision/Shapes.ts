@@ -62,12 +62,17 @@ const AXES: readonly AxisAccessor[] = [
 
 const TOLERANCE = 1e-4;
 
-export interface Shape {
-  getBounds(): Box;
-  hit(ray: Ray, t0: number, t1: number): HitRecord | Array<HitRecord> | null;
+export abstract class Shape {
+  abstract getBounds(): Box;
+  abstract hit(ray: Ray, t0: number, t1: number): HitRecord | Array<HitRecord> | null;
+  ka: Vec3 = new Vec3(0.05, 0.05, 0.05);  // Ambient
+  kd: Vec3 = new Vec3(0.05, 0.05, 0.05);  // Diffuse
+  ks: Vec3 = new Vec3(0.05, 0.05, 0.05);  // Specular
+  ns: number = 8;                                   // Shininess
+  rho: number = 0;                                  // Reflectivity
 }
 
-class Box implements Shape {
+export class Box extends Shape {
   private box: BoundingBox;
 
   get min(): Vec3 {
@@ -164,6 +169,7 @@ class Box implements Shape {
   }
 
   constructor(box: BoundingBox) {
+    super();
     this.box = box;
   }
 
@@ -177,8 +183,8 @@ class Box implements Shape {
   }
 }
 
-type TrianglePoints = [Vec3, Vec3, Vec3];
-class Triangle implements Shape {
+export type TrianglePoints = [Vec3, Vec3, Vec3];
+export class Triangle extends Shape {
   #points: TrianglePoints;
   #bounds: Box;
 
@@ -241,12 +247,13 @@ class Triangle implements Shape {
   }
 
   constructor(points: TrianglePoints) {
+    super();
     this.#points = points;
     this.#bounds = Box.fromPoints(points);
   }
 }
 
-class Sphere implements Shape {
+export class Sphere extends Shape {
   #origin: Vec3;
   #radius: number;
   #bounds!: Box;
@@ -263,8 +270,8 @@ class Sphere implements Shape {
   recalculateBounds() {
     const rad = new Vec3(this.#radius);
     const boundingBox = {
-      min: Vec3.sub(this.origin, rad),
-      max: Vec3.add(this.origin, rad),
+      min: Vec3.sub(this.#origin, rad),
+      max: Vec3.add(this.#origin, rad),
     }
 
     this.#bounds = new Box(boundingBox);
@@ -304,6 +311,7 @@ class Sphere implements Shape {
   }
 
   constructor(origin: Vec3, radius: number) {
+    super();
     this.#origin = origin;
     this.#radius = radius;
     this.recalculateBounds();

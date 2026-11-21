@@ -10,6 +10,10 @@ declare global {
   interface WindowEventMap {
     "tick": CustomEvent<TickData>
   }
+
+  // Fixed length tuple pattern
+  type Tuple<T, N extends number, R extends unknown[] = []>
+    = R['length'] extends N ? R : Tuple<T, N, [T, ...R]>;
 }
 
 export {};

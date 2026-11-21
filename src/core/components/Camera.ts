@@ -26,6 +26,12 @@ export type {OrthographicBound};
 type ProjectionType = "perspective" | "orthographic";
 export type {ProjectionType};
 
+type Bound = Vec2 | null;
+type Bound2 = Tuple<Bound, 2>;
+type Bound3 = Tuple<Bound, 3>;
+
+const DEG_89 = 1.55334303;
+
 interface CameraNodeDescriptor extends SceneNodeDescriptor {
   sensitivity?: Vec2;
   tetherDistance?: number;
@@ -41,6 +47,7 @@ interface CameraNodeDescriptor extends SceneNodeDescriptor {
 
   lockMovement?: boolean;
   lockRotation?: boolean;
+  rotationBounds?: Bound3;
 }
 export type {CameraNodeDescriptor};
 
@@ -69,6 +76,7 @@ export class Camera extends SceneNode {
   moveSpeed: number = 0.1;
   moveSpeedMultiplier: number = 3; // Shift multiplier for move speed
   lockMovement: boolean;
+  rotationBounds: Bound3;
 
   static activeCamera: Camera;
   canvas?: HTMLCanvasElement;
@@ -82,6 +90,7 @@ export class Camera extends SceneNode {
     this.spinSpeed = desc.spinSpeed ?? 0.2; // Spin speed in rad/s
     this.spinEnabled = desc.spinEnabled ?? false;
     this.lockRotation = desc.lockRotation ?? false;
+    this.rotationBounds = desc.rotationBounds ?? [new Vec2(-DEG_89, DEG_89), null, null];
 
     this.clipNear = desc.clipNear ?? 1;
     this.clipFar = desc.clipFar ?? 50;
@@ -157,10 +166,10 @@ export class Camera extends SceneNode {
   /** Returns camera position, including the boom. */
   getCameraPosition(): Vec3 {
     if (this.tetherDistance <= 0)
-      return this.transform.position();
+      return this.transform.translation;
 
     // Compose the real node position with the camera boom
-    let origin: Mat4 = super.tra;
+    let origin: Mat4 = this.transform.worldTransform;
     let tether: Mat4 = Mat4.multiply(
       Transforms.fromEulerZYX(this.tetherRotation.z, this.tetherRotation.y, this.tetherRotation.x),
       Transforms.translate(0, 0, -this.tetherDistance)
@@ -230,26 +239,28 @@ export class Camera extends SceneNode {
   addRotation(yaw: number, pitch: number, roll: number = 0) {
     // Pitch w/ Clamp
     this.tetherRotation.x += pitch * this.sensitivity.x;
-    const DEG_89 = 1.55334303;
-    if (Math.abs(this.tetherRotation.x) > DEG_89)
-      this.tetherRotation.x = DEG_89 * Math.sign(this.tetherRotation.x);
-
     this.tetherRotation.y = (this.tetherRotation.y + yaw * this.sensitivity.y) % 360;
     this.tetherRotation.z = (this.tetherRotation.z + roll) % 360;
+
+    // Clamp using rotation bounds (by default only clamps pitch to +-89 degrees)
+    if (this.rotationBounds[0])
+      this.tetherRotation.x = Math.min(Math.max(this.tetherRotation.x, this.rotationBounds[0].x), this.rotationBounds[0].x);
+    if (this.rotationBounds[1])
+      this.tetherRotation.y = Math.min(Math.max(this.tetherRotation.y, this.rotationBounds[1].y), this.rotationBounds[1].y);
+    if (this.rotationBounds[2])
+      this.tetherRotation.z = Math.min(Math.max(this.tetherRotation.z, this.rotationBounds[2].x), this.rotationBounds[2].x);
   }
 
   addMovement(move: Vec2) {
     const f = this.getForwardVector();
     const r = this.getRightVector();
 
-    let translate = Mat4.multiply(
-      Transforms.translateVec3(Vec3.scale(r, move.y)),
-      Transforms.translateVec3(Vec3.scale(f, move.x)));
-
-    this.transform = Mat4.multiply(
-      translate,
-      this.transform
+    const moveVec = Vec3.add(
+      Vec3.scale(r, move.y),
+      Vec3.scale(f, move.x)
     );
+
+    this.transform.translation = Vec3.add(this.transform.translation, moveVec);
   }
 
   override tick(_dt: number) {
