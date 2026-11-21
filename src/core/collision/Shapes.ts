@@ -66,8 +66,8 @@ export abstract class Shape {
   abstract getBounds(): Box;
   abstract hit(ray: Ray, t0: number, t1: number): HitRecord | Array<HitRecord> | null;
   ka: (this: Shape, x: Vec3, n: Vec3) => Vec3 = (x, n) => { return this.kd(x, n).scale(0.5); };  // Ambient
-  kd: (this: Shape, x: Vec3, n: Vec3) => Vec3 = (x, n) => { return new Vec3(0.05, 0.05, 0.05); };  // Diffuse
-  ks: (this: Shape, x: Vec3, n: Vec3) => Vec3 = (x, n) => { return this.kd(x, n).scale(1.2).clamp(0, 1); };  // Specular
+  kd: (this: Shape, x: Vec3, n: Vec3) => Vec3 = (x, n) => { return new Vec3(0.5, 0.5, 0.5); };  // Diffuse
+  ks: (this: Shape, x: Vec3, n: Vec3) => Vec3 = (x, n) => { return new Vec3(0.05, 0.05, 0.05); };  // Specular
   ns: number = 8;                                   // Shininess
   rho: number = 0;                                  // Reflectivity
 }
@@ -142,6 +142,8 @@ export class Box extends Shape {
         axis.set(normal, Math.sign(ka));
       }
     }
+    normal = normal.normalize();
+    if (Vec3.dot(normal, ray.direction) > 0) normal = normal.negate();
 
     return new HitRecord(this, t, position, normal);
   }
@@ -219,7 +221,7 @@ export class Triangle extends Shape {
       return null;
 
     const position = ray.evaluate(t);
-    const normal = Vec3.triangleNormal(this.#points[0], this.#points[1], this.#points[2]);
+    const normal = Vec3.triangleNormal(this.#points[0], this.#points[2], this.#points[1]);
     return new HitRecord(this as Shape, t, position, normal);
   }
 

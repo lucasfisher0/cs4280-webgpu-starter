@@ -69,10 +69,6 @@ async function init() {
 
 
     // ---------- Objects ----------
-    //const background = [0.6, 0.7, 0.9];
-    const background = new Vec3(0.566, 0.658, 0.960);
-    const background2 = new Vec3(0.205, 0.246, 0.380);
-
     const room = new Shapes.Box({
       min: new Vec3(-4, 0,  -3.5),
       max: new Vec3( 4, 3.8, 5),
@@ -91,8 +87,7 @@ async function init() {
       if (n.y < 0)
         return ceiling;
       else
-        return new Vec3(0.2);
-        //return wall;
+        return wall;
     }
 
     const mirror = new Shapes.Box({
@@ -114,8 +109,8 @@ async function init() {
       max: new Vec3(1.4, 0.7, 0.6),
     });
     mattress.kd = (x: Vec3, n: Vec3) => {
-      const light = new Vec3(0.6980, 0.1333, 0.1333);
-      const dark = new Vec3(0.0980, 0.1451, 0.2902);
+      const light = new Vec3(0.129, 0.812, 0.749);
+      const dark = new Vec3(0.024, 0.18, 0.165);
 
       if (n.y > 0) {
         const xp = Math.abs(x.x) % 0.7;
@@ -133,7 +128,6 @@ async function init() {
 
     const redBall = new Shapes.Sphere(new Vec3(2.2, 0.4, -0.9), 0.4);
     redBall.kd = () => { return new Vec3(1, 0, 0); }
-
 
     // ------------------ LOAD CAR
     let {positions, texcoords, normals, triangles, materialLibraries} = parseOBJ(carOBJ);
@@ -166,7 +160,7 @@ async function init() {
       const kd = mat.Kd;
       const ks = mat.Ks;
       shape.kd = () => { return mat.Kd; };
-      shape.ks = () => { return ks; };
+      shape.ks = () => { return mat.Ks; };
       shape.ns = mat.Ns;
       shape.rho = 3.0 * ks.x;
 
@@ -231,31 +225,34 @@ async function init() {
     function shadeRay(ray: Ray, t0: number, t1: number, depth: number = 0): Vec3 {
       const rec = sceneHit(ray, t0, t1);
       if (!rec)
-        return Vec3.add(ray.origin, ray.direction.scale(1000)).y <= 0 ? background2 : background;
+        return Vec3.Zero();
       // console.log("Hit: " + rec.shape!.constructor.name);
 
       const x = rec.position;
       const d = ray.direction;
-      const n = Vec3.dot(rec.normal, d) > 0 ? rec.normal.negate().normalize() : rec.normal.normalize();
+      const n = rec.normal.normalize();
       // const ka = rec.shape!.ka(x, n); // Unused for now
       const kd = rec.shape!.kd(x, n);
       const ks = rec.shape!.ks(x, n);
       const ns = rec.shape!.ns;
 
-      const l = Vec3.sub(lightPos, x);
-      const ln = l.normalize();
+      const l = Vec3.sub(lightPos, x).normalize();
       const r = l.length();
       const v = d.normalize().negate();
-      const h = Vec3.add(ln, v).normalize();
+      const h = Vec3.add(l, v).normalize();
 
-      const shadowRay = new Ray(Vec3.add(rec.position!, n!.scale(delta)), ln);
+      const shadowRay = new Ray(Vec3.add(rec.position!, n!.scale(delta)), l);
       const inShadow = (sceneHit(shadowRay, eps, r)?.t ?? Infinity) < r;
 
       // c = kd (alpha + (1 - alpha) max(0, n·l)) + ks max(0, n·h)^p
       let c = kd.scale(alpha).clamp(0, 1);
-      if (!inShadow && Vec3.dot(n, ln) > 0) {
+      if (!inShadow && Vec3.dot(n, l) > 0) {
+        const diffuse = kd.scale(alpha + (1 - alpha)*Math.max(0, Vec3.dot(n, l)))
         const spec = ks.scale(Math.max(0, Vec3.dot(n, h)) ** ns);
-        c = Vec3.add(kd.scale(alpha + (1 - alpha) * Vec3.dot(n, l)), spec);
+
+        const dotHalf = Vec3.dot(n, h)
+        const dotLight = Vec3.dot(n, l)
+        c = Vec3.add(diffuse, spec);
       }
 
       // Mirror: r = d - 2(d·n)n, blended as c = (1 - rho) c + rho c_reflected
@@ -291,9 +288,11 @@ async function init() {
     let u: Vec3;
     let v: Vec3;
     const restart = () => {
-      pixels = new Uint8Array(canvas.width * canvas.height * 4); // RGBA, row 0 at the top
-      nx = Math.floor(canvas.width * state.resolutionScale / 64) * 64;  // Divide by 64 to get correct alignment
-      ny = Math.floor(canvas.height * state.resolutionScale);
+      const rect = canvas.getBoundingClientRect();
+      nx = Math.max(1, Math.floor(rect.width * window.devicePixelRatio * state.resolutionScale / 64)) * 64;  // Divide by 64 to get correct alignment
+      ny = Math.max(1, Math.floor(rect.height * window.devicePixelRatio * state.resolutionScale));
+      pixels = new Uint8Array(nx * ny * 4); // RGBA, row 0 at the top
+
       cursor = 0;
       state.raysTraced = 0;
       state.triangleTests = 0;
@@ -307,14 +306,7 @@ async function init() {
         Math.cos(p)*Math.sin(y),
         Math.sin(p),
         Math.cos(p)*Math.cos(y)).normalize().scale(state.distance));
-      console.log(`Camera pos: ${e}`)
-
-      const testRay = new Ray(e, Vec3.sub(new Vec3(2.2, 0.4, -0.9), e).normalize());
-      console.log('red ball hit:', sceneHit(testRay, 0, Infinity)?.shape?.constructor.name);
-
-      const centerD = Vec3.sub(target, e).normalize();
-      const centerHit = sceneHit(new Ray(e, centerD), 0, Infinity);
-      console.log('center hit:', centerHit?.shape?.constructor.name, centerHit?.t);
+      // console.log(`Camera pos: ${e}`)
 
       w = Vec3.sub(target, e).negate().normalize();
       u = Vec3.cross(up, w).normalize();
@@ -345,8 +337,7 @@ async function init() {
         pendingRestart = true;
       })
     })
-
-
+    window.addEventListener('resize', () => pendingRestart = true );
 
     restart();
     animate(
@@ -395,7 +386,7 @@ async function init() {
           //
           cursor++;
         }
-        state.progress = `${(cursor / (nx * ny)).toFixed(2)}%`;
+        state.progress = `${(cursor * 100 / (nx * ny)).toFixed(2)}%`;
 
         device.queue.writeTexture({ texture }, pixels, { bytesPerRow: nx * 4 }, [nx, ny]);
       });

@@ -66,6 +66,14 @@ export class Vec3 {
     return new Vec3(jsVec[0], jsVec[1], jsVec[2]);
   }
 
+  /** Component-wise multiplication. */
+  hadamard(b: Vec3): Vec3 {
+    const x = this.x * b.x;
+    const y = this.y * b.y;
+    const z = this.z * b.z;
+    return new Vec3(x, y, z);
+  }
+
   clamp(min: number, max: number) {
     this.x = Math.max(Math.min(max, this.x), min);
     this.y = Math.max(Math.min(max, this.y), min);
