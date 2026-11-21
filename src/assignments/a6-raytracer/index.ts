@@ -11,6 +11,10 @@ import * as Transforms from "@/core/math/Transforms.ts";
 
 import * as Shapes from "@/core/collision/Shapes.ts"
 import {HitRecord, Ray} from "@/core/raytracing/Ray.ts";
+import {parseOBJ, parseMTL} from "@/core/assets/Wavefront.ts";
+import carOBJ from "./car.obj?raw";
+import carMTL from "./car.mtl?raw";
+
 
 const deg2rad = (deg: number)=> {
   return deg * Math.PI / 180;
@@ -27,7 +31,7 @@ const state = {
   distance: 5.2,
 
   // Stats
-  progress: 0,
+  progress: "0%",
   raysTraced: 0,
   triangleTests: 0
 };
@@ -64,7 +68,7 @@ async function init() {
     });
 
 
-    // ---------- Scene ----------
+    // ---------- Objects ----------
     //const background = [0.6, 0.7, 0.9];
     const background = new Vec3(0.566, 0.658, 0.960);
     const background2 = new Vec3(0.205, 0.246, 0.380);
@@ -76,7 +80,7 @@ async function init() {
     room.kd = (x: Vec3, n: Vec3) => {
       const woodLight = new Vec3(0.8235, 0.7059, 0.5490);
       const woodDark = new Vec3(0.3608, 0.1725, 0.1137);
-      const wall = new Vec3(0.968, 0.980, 0.988);
+      const wall = new Vec3(0.7784, 0.7588, 0.7196);
       const ceiling = new Vec3(0.9804, 0.8980, 0.7451);
 
       if (n.y > 0)
@@ -87,7 +91,8 @@ async function init() {
       if (n.y < 0)
         return ceiling;
       else
-        return wall;
+        return new Vec3(0.2);
+        //return wall;
     }
 
     const mirror = new Shapes.Box({
@@ -129,6 +134,47 @@ async function init() {
     const redBall = new Shapes.Sphere(new Vec3(2.2, 0.4, -0.9), 0.4);
     redBall.kd = () => { return new Vec3(1, 0, 0); }
 
+
+    // ------------------ LOAD CAR
+    let {positions, texcoords, normals, triangles, materialLibraries} = parseOBJ(carOBJ);
+
+    const carTransform = Mat4.multiplyAll([
+      Transforms.translate(0, 0.7, -1.4),
+      Transforms.fromEulerZYX(0, 0, 0),
+      Transforms.scale(0.66, 0.66, 0.66)
+    ]);
+
+    let tPositions: Vec3[] = [];
+    positions.forEach(p => {
+      const v = new Vec4(p.x, p.y, p.z, 1);
+      const f = Mat4.multiplyVec4(carTransform, v);
+      tPositions.push(new Vec3(f.x, f.y, f.z));
+    })
+    const carBounds = Shapes.Box.fromPoints(tPositions);
+
+    const materials = parseMTL(carMTL);
+
+
+    let carTriangles: Shapes.Triangle[] = [];
+    triangles.forEach(tri => {
+      const p1 = tPositions[tri.corners[0]!.p]!;
+      const p2 = tPositions[tri.corners[1]!.p]!;
+      const p3 = tPositions[tri.corners[2]!.p]!;
+
+      const shape = new Shapes.Triangle([p1, p2, p3]);
+      const mat = materials[tri.material!]!;
+      const kd = mat.Kd;
+      const ks = mat.Ks;
+      shape.kd = () => { return mat.Kd; };
+      shape.ks = () => { return ks; };
+      shape.ns = mat.Ns;
+      shape.rho = 3.0 * ks.x;
+
+      carTriangles.push(shape);
+    });
+
+    // ------------------ SCENE
+
     const scene = [room, mirror, boxspring, mattress, silverBall, redBall];
     // Quick and dirty set all specular highlights to white as per spec
     scene.forEach(shape => {
@@ -136,27 +182,45 @@ async function init() {
     });
 
     function sceneHit(ray: Ray, t0: number, t1: number): HitRecord | undefined {
-      // console.warn("sceneHit: starting");
       let closest: HitRecord | undefined;
-      for (const surf of scene) {
+
+      const sceneObjects = state.useCarBounds ? [...scene, carBounds] : [...scene, ...carTriangles];
+      for (const surf of sceneObjects) {
         state.raysTraced++;
+        const rec = surf.hit(ray, t0, t1);
+        if (rec)
+        {
+          let hit = Array.isArray(rec) ? rec[0] : rec;
+          if (hit?.shape === carBounds) {
+            hit = meshHit(ray, t0, t1, carTriangles);
+          }
+          if (!hit)
+            continue;
+          if (!closest || hit.t < closest.t) {
+            closest = hit;
+            t1 = closest!.t;
+          }
+        }
+      }
+      return closest;
+    }
+
+    function meshHit(ray: Ray, t0: number, t1: number, tris: Shapes.Triangle[]): HitRecord | undefined {
+      let closest: HitRecord | undefined;
+      for (const surf of tris) {
+        state.triangleTests++;
         const rec = surf.hit(ray, t0, t1);
         if (rec)
         {
           const hit = Array.isArray(rec) ? rec[0]! : rec;
           if (!closest || hit.t < closest.t) {
-            // console.log(`New closest: ${hit.t}. Prev: ${closest?.t}`);
             closest = hit;
-            t1 = closest.t;
+            t1 = closest!.t;
           }
         }
       }
-      // console.warn("sceneHit: finished");
       return closest;
     }
-
-
-
 
     // ---------- Shading ----------
     const lightPos = new Vec3(-1, 3.2, 2.4);
@@ -172,7 +236,7 @@ async function init() {
       const x = rec.position;
       const d = ray.direction;
       const n = Vec3.dot(rec.normal, d) > 0 ? rec.normal.negate().normalize() : rec.normal.normalize();
-      const ka = rec.shape!.ka(x, n); // Unused for now
+      // const ka = rec.shape!.ka(x, n); // Unused for now
       const kd = rec.shape!.kd(x, n);
       const ks = rec.shape!.ks(x, n);
       const ns = rec.shape!.ns;
@@ -230,6 +294,8 @@ async function init() {
       nx = Math.floor(canvas.width * state.resolutionScale / 64) * 64;  // Divide by 64 to get correct alignment
       ny = Math.floor(canvas.height * state.resolutionScale);
       cursor = 0;
+      state.raysTraced = 0;
+      state.triangleTests = 0;
 
       // ---------- Camera ----------
       const y = deg2rad(state.yaw);
@@ -328,6 +394,7 @@ async function init() {
           //
           cursor++;
         }
+        state.progress = `${(cursor / (nx * ny)).toFixed(2)}%`;
 
         device.queue.writeTexture({ texture }, pixels, { bytesPerRow: nx * 4 }, [nx, ny]);
       });

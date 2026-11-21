@@ -3,9 +3,9 @@ import {Vec3} from "@/core/math/Vec3.ts";
 import {Vec4} from "@/core/math/Vec4.ts";
 import {Mat4} from "@/core/math/Mat4.ts";
 import * as Transforms from "@/core/math/Transforms.ts";
-import * as JSGeometry from "@/lib/webgpu/geometry";
+import * as JSGeometry from "@/lib/webgpu";
 import {Mesh} from "@/core/render/Mesh.ts";
-import {createBuffer} from "@/lib/webgpu/buffers";
+import {createBuffer} from "@/lib/webgpu";
 
 interface JSIndexedMesh {
   positions: Float32Array,
@@ -18,7 +18,7 @@ interface JSIndexedMesh {
 export type {JSIndexedMesh};
 
 /** Interleaves position, normal, and uv for the expected shader format. */
-function interleaveVertexData(positions: Vec3[], normals: Vec3[], uvs: Vec2[]): Float32Array {
+function interleaveVertexData(positions: Vec3[], normals: Vec3[], uvs: Vec2[]) {
   if (positions.length != normals.length || positions.length != uvs.length) {
     console.warn("interleaveVertexData: Mesh had a mismatching number of positions, normals, and uvs.");
   }
@@ -43,7 +43,7 @@ export class IndexedMesh extends Mesh {
 
   constructor(device: GPUDevice, positions: Vec3[], normals: Vec3[], uvs: Vec2[], indices: number[]) {
     // Mesh setup, requires initialization of buffers before accessing instance members
-    let vertexData: Float32Array = interleaveVertexData(positions, normals, uvs);
+    let vertexData = interleaveVertexData(positions, normals, uvs);
     let vertexBuffer = createBuffer(device, vertexData, GPUBufferUsage.VERTEX);
     let indexBuffer = createBuffer(device, new Uint16Array(indices), GPUBufferUsage.INDEX);
     super(vertexBuffer, indexBuffer);
@@ -78,10 +78,10 @@ export class IndexedMesh extends Mesh {
   }
 }
 
-export function createCubeGeometry(device: GPUDevice, size: number = 1) {
-  return IndexedMesh.fromArray(device, JSGeometry.createCubeGeometry(size) as JSIndexedMesh);
-}
-
-export function createSphereGeometry(device: GPUDevice, radius: number = 1, latitudeBands: number = 24, longitudeBands: number = 24) {
-  return IndexedMesh.fromArray(device, JSGeometry.createSphereGeometry(radius, latitudeBands, longitudeBands) as JSIndexedMesh);
-}
+// export function createCubeGeometry(device: GPUDevice, size: number = 1) {
+//   return IndexedMesh.fromArray(device, JSGeometry.createCubeGeometry(size) as JSIndexedMesh);
+// }
+//
+// export function createSphereGeometry(device: GPUDevice, radius: number = 1, latitudeBands: number = 24, longitudeBands: number = 24) {
+//   return IndexedMesh.fromArray(device, JSGeometry.createSphereGeometry(radius, latitudeBands, longitudeBands) as JSIndexedMesh);
+// }
